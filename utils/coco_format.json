@@ -1,0 +1,96 @@
+{
+    "info": {
+        "year": 2021,
+        "version": "1.0",
+        "description": "Pedestrian",
+        "contributor": "AI Hub",
+        "url": "https://aihub.or.kr/aidata/136",
+        "date_created": "2021-11-26 02:39:00"
+    },
+    "licenses": [
+        {
+            "id": 0,
+            "name": "",
+            "url": ""
+        }
+    ],
+    "categories": [
+        {
+            "id": 0,
+            "name": "car",
+            "supercategory": null
+        },
+        {
+            "id": 1,
+            "name": "person",
+            "supercategory": null
+        },
+        {
+            "id": 2,
+            "name": "traffic_light",
+            "supercategory": null
+        },
+        {
+            "id": 3,
+            "name": "truck",
+            "supercategory": null
+        },
+        {
+            "id": 4,
+            "name": "bicycle",
+            "supercategory": null
+        },
+        {
+            "id": 5,
+            "name": "motorcycle",
+            "supercategory": null
+        },
+        {
+            "id": 6,
+            "name": "bus",
+            "supercategory": null
+        },
+        {
+            "id": 7,
+            "name": "carrier",
+            "supercategory": null
+        },
+        {
+            "id": 8,
+            "name": "stroller",
+            "supercategory": null
+        },
+        {
+            "id": 9,
+            "name": "scooter",
+            "supercategory": null
+        },
+        {
+            "id": 10,
+            "name": "wheelchair",
+            "supercategory": null
+        }
+    ],
+    "images": [
+        {
+            "license": 0,
+            "url": null,
+            "file_name": "",
+            "height": 512,
+            "width": 512,
+            "data_captured": null,
+            "id": 0
+        }
+    ],
+    "annotations": [
+        {
+            "id": 0,
+            "image_id": 0,
+            "category_id": 0,
+            "bbox": [],
+            "area": 1,
+            "segmentation": [],
+            "iscrowd": 0
+        }
+    ]
+}
