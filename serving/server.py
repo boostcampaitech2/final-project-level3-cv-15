@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Request, Form, File, UploadFile
 from fastapi.templating import Jinja2Templates
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List, Optional
 
@@ -9,6 +10,8 @@ import numpy as np
 import torch
 import base64
 import random
+
+from help_funcs import get_stream_video
 
 app = FastAPI()
 templates = Jinja2Templates(directory = 'templates')
@@ -43,51 +46,24 @@ def about_us(request: Request):
 			{"request": request})
 
 
+def video_streaming(model_name, img_size):
+	return get_stream_video(model_name, img_size)
+
 ##############################################
 #------------POST Request Routes--------------
 ##############################################
-@app.post("/")
-async def detect_via_web_form(request: Request,
-							file_list: List[UploadFile] = File(...), 
-							model_name: str = Form(...),
-							img_size: int = Form(640)):
-	
+@app.get("/video_feed")
+async def detect_via_web_form():
+	model_name = 'yolov5s'
+	img_size = 640
 	'''
 	Requires an image file upload, model name (ex. yolov5s). Optional image size parameter (Default 640).
 	Intended for human (non-api) users.
 	Returns: HTML template render showing bbox data and base64 encoded image
 	'''
+	print("여기여기")
 
-	#assume input validated properly if we got here
-	if model_dict[model_name] is None:
-		model_dict[model_name] = torch.hub.load('ultralytics/yolov5', model_name, pretrained=True)
-
-	img_batch = [cv2.imdecode(np.fromstring(await file.read(), np.uint8), cv2.IMREAD_COLOR)
-					for file in file_list]
-
-	#.copy() because the images are modified when running model, and we need originals when drawing bboxes later
-	results = model_dict[model_name](img_batch.copy(), size = img_size)
-
-	json_results = results_to_json(results,model_dict[model_name])
-
-	img_str_list = []
-	#plot bboxes on the image
-	for img, bbox_list in zip(img_batch, json_results):
-		for bbox in bbox_list:
-			label = f'{bbox["class_name"]} {bbox["confidence"]:.2f}'
-			plot_one_box(bbox['bbox'], img, label=label, 
-					color=colors[int(bbox['class'])], line_thickness=3)
-
-		img_str_list.append(base64EncodeImage(img))
-
-	#escape the apostrophes in the json string representation
-	encoded_json_results = str(json_results).replace("'",r"\'").replace('"',r'\"')
-
-	return templates.TemplateResponse('show_results.html', {
-			'request': request,
-			'bbox_image_data_zipped': zip(img_str_list,json_results), #unzipped in jinja2 template
-			'bbox_data_str': encoded_json_results,
-		})
+	return StreamingResponse(video_streaming(model_name, img_size), media_type = "multipart/x-mixed-replace; boundary=frame")
 
 
 @app.post("/detect/")
