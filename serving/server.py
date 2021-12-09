@@ -11,7 +11,7 @@ import torch
 import base64
 import random
 
-from help_funcs import get_stream_video
+from help_funcs import get_stream_cam
 
 app = FastAPI()
 templates = Jinja2Templates(directory = 'templates')
@@ -47,7 +47,7 @@ def about_us(request: Request):
 
 
 def video_streaming(model_name, img_size):
-	return get_stream_video(model_name, img_size)
+	return get_stream_cam(model_name, img_size)
 
 ##############################################
 #------------POST Request Routes--------------
@@ -61,7 +61,6 @@ async def detect_via_web_form():
 	Intended for human (non-api) users.
 	Returns: HTML template render showing bbox data and base64 encoded image
 	'''
-	print("여기여기")
 
 	return StreamingResponse(video_streaming(model_name, img_size), media_type = "multipart/x-mixed-replace; boundary=frame")
 
