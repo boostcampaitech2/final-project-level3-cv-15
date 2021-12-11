@@ -37,7 +37,7 @@ def get_stream_cam(model_name: str = Form(...),
     '''
 
     # 하드 코딩 된 부분 >> 인자 받아보게 변경, yaml or from html
-    mode = 'onnx'
+    mode = 'torch'
 
     if mode == 'torch':
         model = torch.hub.load('ultralytics/yolov5', model_name, pretrained=True)
@@ -45,7 +45,9 @@ def get_stream_cam(model_name: str = Form(...),
         model = onnxruntime.InferenceSession(model_name+'.onnx')
 
     # Image from Camera no.0
-    img_batch = cv2.VideoCapture(0)
+    V='/Users/ansojung/final-project-level3-cv-15/serving/test_1.mp4'
+    img_batch = cv2.VideoCapture(V)
+    
     
     # FPS 추가 필요
     while True:
@@ -116,6 +118,8 @@ def inference_with_pt(img_batch, model, img_size):
 # with pytorch
 def results_to_json(results, model):
     # Converts yolo model output to json (list of list of dicts)
+    
+    
     return [
         [
             {
@@ -230,7 +234,34 @@ def non_max_suppression(prediction, conf_thres=0.5, iou_thres=0.6, classes=None,
         # Detections matrix nx6 (xyxy, conf, cls).
         if multi_label:
             i, j = torch.nonzero(torch.Tensor(x[:, 5:] > conf_thres), as_tuple=False).T
-            x = torch.cat((torch.Tensor(box[i]), torch.Tensor(x[i, j + 5, None]), j[:, None].float()), 1)
+            
+            # print(i.size(), j.size())
+            # i=i.reshape(1,i.size()[0])
+            # j=j.reshape(1,j.size()[0])
+            # print("i값:",i, "j값",j)
+            tmp1=torch.Tensor(box[i])
+            tmp2=torch.Tensor(x[i, j + 5, None])
+            tmp3=j[:, None].float()
+            print(i.size(), j.size())
+            if i.size()[0]==1 and j.size()[0]==1:
+                print("통과!")
+                tmp1=tmp1.reshape(1,tmp1.size()[0])
+                tmp2=tmp2.reshape(1,tmp2.size()[0])
+    
+            # tmp1=torch.Tensor(box[i])
+            # tmp2=torch.Tensor(x[i, j + 5, None])
+            # tmp3=j[:, None].float()
+            
+            print('tmp1:',tmp1.size())
+            print('tmp2:',tmp2.size())
+            print('tmp3:',tmp3.size())
+            print('concat:',(tmp1,tmp2,tmp3))
+            
+            #print(box)
+            x=torch.cat((tmp1,tmp2,tmp3),1)
+    
+            #x = torch.cat((torch.Tensor(box[i]), torch.Tensor(x[i, j + 5, None]), j[:, None].float()), 1)
+              
         else:
             # Best class only.
             conf, j = x[:, 5:].max(1, keepdim=True)
