@@ -16,6 +16,8 @@ from PIL import Image
 
 import torchvision.transforms as transforms
 
+import base64
+
 import imageio
 
 
@@ -25,43 +27,37 @@ classes = ['person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train',
 
 colors = [tuple([random.randint(0, 255) for _ in range(3)]) for _ in range(100)] #for bbox plotting
 
+
 def get_stream_cam(model_name: str = Form(...),
-                        img_size: int = Form(640)):
+                   img_size: int = Form(640)):
     '''
     Requires an image file upload, model name (ex. yolov5s). Optional image size parameter (Default 640).
     Intended for human (non-api) users.
     Returns: HTML template render showing bbox data and base64 encoded image
     '''
-    model_name = 'yolov5s'
-    img_size = 640
+
+    # 하드 코딩 된 부분 >> 인자 받아보게 변경, yaml or from html
     mode = 'onnx'
-    # assume input validated properly if we got here
-    if model_dict[model_name] is None:
-        if mode == 'torch':
-            model_dict[model_name] = torch.hub.load('ultralytics/yolov5', model_name, pretrained=True)
-        elif mode == 'onnx':
-            model_dict[model_name] = onnxruntime.InferenceSession(model_name+'.onnx')
 
-    # img_batch = [cv2.imdecode(np.fromstring(await file.read(), np.uint8), cv2.IMREAD_COLOR) for file in file_list]
+    if mode == 'torch':
+        model = torch.hub.load('ultralytics/yolov5', model_name, pretrained=True)
+    elif mode == 'onnx':
+        model = onnxruntime.InferenceSession(model_name+'.onnx')
 
-    #img = cv2.imread("./images/bus.jpg")
-    #print('임지',img.shape)
+    # Image from Camera no.0
     img_batch = cv2.VideoCapture(0)
-    # img_batch.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-
-    # FPS = 1000
+    
+    # FPS 추가 필요
     while True:
-        # time check
+        # time check should be here
         if mode == 'onnx':
-            img = inference_with_onnx(img_batch, model_dict[model_name])
+            img = inference_with_onnx(img_batch, model)
         elif mode == 'torch':
-            img = inference_with_pt(img_batch, model_dict[model_name], img_size)
+            img = inference_with_pt(img_batch, model, img_size)
         # time check end
         yield (b'--frame\r\n' 
                b'Content-Type: image/jpeg\r\n\r\n' +
                img.tobytes() + b'\r\n')
-
-        #cv2.imshow("VideoFrame", frame)
 
         if cv2.waitKey(100) > 0:
             break
@@ -72,68 +68,70 @@ def to_numpy(tensor):
 
 
 def inference_with_onnx(img_batch, model):
-    # frame.shape : (Height, Width, BGR) >> to RGB img = img[:,:,::-1]
+    # CV2 IMAGE / frame.shape : (Height, Width, BGR) >> to RGB img = img[:,:,::-1]
     ret, frame = img_batch.read()
-    img = frame
-    frame2 = frame
 
-    frame = frame.astype(np.float32) #
-    frame = cv2.resize(frame, (640, 640), interpolation=cv2.INTER_CUBIC) # 용의선상 x
-    frame = np.transpose(frame, axes=(2, 0, 1)) # <<
-    frame = np.expand_dims(frame, axis=0) # unsqueeze(0)
+    '''
+    # JPG to >> 1 3 640 640
+    frame_jpg = frame.astype(np.float32)
+    frame_jpg = cv2.resize(frame_jpg, (640, 640), interpolation=cv2.INTER_CUBIC)
+    frame_jpg = np.transpose(frame_jpg, axes=(2, 0, 1))
+    frame_jpg = np.expand_dims(frame_jpg, axis=0)  # unsqueeze(0)
+    '''
 
-
-    # YCBCR
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    img = cv2.resize(img, (640, 640), interpolation=cv2.INTER_CUBIC)
-    img = Image.fromarray(img)
-    img_ycbcr = img.convert('YCbCr')
+    # PIL IMAGE / YCBCR >> jpg to YCbCr(1, 3, 640, 640)
+    frame_ycbcr = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    frame_ycbcr = cv2.resize(frame_ycbcr, (640, 640), interpolation=cv2.INTER_CUBIC)
+    frame_ycbcr = Image.fromarray(frame_ycbcr)
+    frame_ycbcr = frame_ycbcr.convert('YCbCr')
 
     to_tensor = transforms.ToTensor()
-    img_y = to_tensor(img_ycbcr)
-    img_y.unsqueeze_(0)
-    frame = to_numpy(img_y)
-    # === end
-    img = frame2
 
+    frame_ycbcr = to_tensor(frame_ycbcr)
+    frame_ycbcr.unsqueeze_(0)
+
+    input_data = to_numpy(frame_ycbcr)
     input_name = model.get_inputs()[0].name
 
-    results = model.run([], {input_name: frame})
+    # Inference
+    results = model.run([], {input_name: input_data})
+    nmx_results = non_max_suppression(results[0], conf_thres=0.5)[0]  # BATCH SIZE is 1.
+    json_results = onnx_results_to_json([nmx_results])
 
-    for i in results:
-        print('result >> ', i.shape)
-
-    out = non_max_suppression(results[0], conf_thres=0.5)[0]  # BATCH SIZE is 1.
-
-    bbox_list = onnx_results_to_json([out])[0] # >> bbox 많음
-
-    for bbox in bbox_list:
-        label = f'{bbox["class_name"]} {bbox["confidence"]:.2f}'
-        plot_one_box(bbox['bbox'], img, label=label, color=colors[int(bbox['class'])], line_thickness=3)
-
-    ret, img = cv2.imencode('.jpg', img)
+    ret, img = plot_result_image(json_results, frame)
 
     return img
 
 
 def inference_with_pt(img_batch, model, img_size):
     ret, frame = img_batch.read()
-
     results = model(frame.copy(), size=img_size)
+    json_results = results_to_json(results, model)
 
-    bbox_list = results_to_json(results, model)[0]
-
-    for bbox in bbox_list:
-        label = f'{bbox["class_name"]} {bbox["confidence"]:.2f}'
-        plot_one_box(bbox['bbox'], frame, label=label, color=colors[int(bbox['class'])], line_thickness=3)
-
-    ret, img = cv2.imencode('.jpg', frame)
+    ret, img = plot_result_image(json_results, frame)
 
     return img
 
 
+# with pytorch
+def results_to_json(results, model):
+    # Converts yolo model output to json (list of list of dicts)
+    return [
+        [
+            {
+                "class": int(pred[5]),
+                "class_name": model.model.names[int(pred[5])],
+                "bbox": [int(x) for x in pred[:4].tolist()],  # convert bbox results to int from float
+                "confidence": float(pred[4]),
+            }
+            for pred in result
+        ]
+        for result in results.xyxy
+    ]
+
+
 def onnx_results_to_json(results):
-    #Converts yolo model output to json (list of list of dicts)
+    # Converts yolo model output to json (list of list of dicts)
     return [
         [
             {
@@ -148,20 +146,13 @@ def onnx_results_to_json(results):
     ]
 
 
-def results_to_json(results, model):
-    #Converts yolo model output to json (list of list of dicts)
-    return [
-        [
-            {
-                "class": int(pred[5]),
-                "class_name": model.model.names[int(pred[5])],
-                "bbox": [int(x) for x in pred[:4].tolist()],  # convert bbox results to int from float
-                "confidence": float(pred[4]),
-            }
-            for pred in result
-        ]
-        for result in results.xyxy
-    ]
+def plot_result_image(json_results, img):
+    for bbox_list in json_results:
+        for bbox in bbox_list:
+            label = f'{bbox["class_name"]} {bbox["confidence"]:.2f}'
+            plot_one_box(bbox['bbox'], img, label=label, color=colors[int(bbox['class'])], line_thickness=3)
+
+    return cv2.imencode('.jpg', img)
 
 
 def plot_one_box(x, im, color=(128, 128, 128), label=None, line_thickness=3):
@@ -179,33 +170,6 @@ def plot_one_box(x, im, color=(128, 128, 128), label=None, line_thickness=3):
         cv2.putText(im, label, (c1[0], c1[1] - 2), 0, tl / 3, [225, 255, 255], thickness=tf, lineType=cv2.LINE_AA)
 
 
-def base64EncodeImage(img):
-    ''' Takes an input image and returns a base64 encoded string representation of that image (jpg format)'''
-    _, im_arr = cv2.imencode('.jpg', img)
-    im_b64 = base64.b64encode(im_arr.tobytes()).decode('utf-8')
-
-    return im_b64
-
-
-if __name__ == '__main__':
-    import uvicorn
-    import argparse
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--host', default='localhost')
-    parser.add_argument('--port', default=8000)
-    parser.add_argument('--precache-models', action='store_true',
-                        help='Pre-cache all models in memory upon initialization, otherwise dynamically caches models')
-    opt = parser.parse_args()
-
-    if opt.precache_models:
-        model_dict = {model_name: torch.hub.load('ultralytics/yolov5', model_name, pretrained=True)
-                      for model_name in model_selection_options}
-
-    app_str = 'server:app'  # make the app string equal to whatever the name of this file is
-    uvicorn.run(app_str, host=opt.host, port=opt.port, reload=True)
-
-
 def non_max_suppression(prediction, conf_thres=0.5, iou_thres=0.6, classes=None, agnostic=False, labels=()):
     """
     Performs Non-Maximum Suppression (NMS) on inference results
@@ -215,7 +179,6 @@ def non_max_suppression(prediction, conf_thres=0.5, iou_thres=0.6, classes=None,
 
     # Number of classes.
     nc = prediction[0].shape[1] - 5
-    print('엔시', nc)
     # Candidates.
     xc = prediction[..., 4] > conf_thres
 
@@ -241,7 +204,6 @@ def non_max_suppression(prediction, conf_thres=0.5, iou_thres=0.6, classes=None,
     t = time.time()
     output = [torch.zeros(0, 6)] * prediction.shape[0]
     for xi, x in enumerate(prediction):  # image index, image inference
-
         # Apply constraints:
         # Confidence.
         x = x[xc[xi]]
@@ -265,15 +227,9 @@ def non_max_suppression(prediction, conf_thres=0.5, iou_thres=0.6, classes=None,
         # Box (center x, center y, width, height) to (x1, y1, x2, y2).
         box = xywh2xyxy(x[:, :4])
 
-        print('클래', classes)
-        print('라벨', labels)
-        #print('에',type((x[:, 5:] > conf_thres).nonezero()))
         # Detections matrix nx6 (xyxy, conf, cls).
         if multi_label:
             i, j = torch.nonzero(torch.Tensor(x[:, 5:] > conf_thres), as_tuple=False).T
-            print('아이', type(box[i]))
-            print('제이', type(x[i, j+5, None]))
-            print('2', type(j[:, None].float()))
             x = torch.cat((torch.Tensor(box[i]), torch.Tensor(x[i, j + 5, None]), j[:, None].float()), 1)
         else:
             # Best class only.
@@ -328,3 +284,11 @@ def xywh2xyxy(x):
     y[:, 2] = x[:, 0] + x[:, 2] / 2  # bottom right x
     y[:, 3] = x[:, 1] + x[:, 3] / 2  # bottom right y
     return y
+
+
+def base64EncodeImage(img):
+    # Takes an input image and returns a base64 encoded string representation of that image (jpg format)
+    _, im_arr = cv2.imencode('.jpg', img)
+    im_b64 = base64.b64encode(im_arr.tobytes()).decode('utf-8')
+
+    return im_b64
