@@ -37,7 +37,7 @@ def get_stream_cam(model_name: str = Form(...),
     '''
 
     # 하드 코딩 된 부분 >> 인자 받아보게 변경, yaml or from html
-    mode = 'torch'
+    mode = 'onnx'
 
     if mode == 'torch':
         model = torch.hub.load('ultralytics/yolov5', model_name, pretrained=True)
@@ -45,34 +45,44 @@ def get_stream_cam(model_name: str = Form(...),
         model = onnxruntime.InferenceSession(model_name+'.onnx')
 
     # Image from Camera no.0
-    V='/Users/ansojung/final-project-level3-cv-15/serving/test_1.mp4'
+    V ='test_1.mp4'
     img_batch = cv2.VideoCapture(V)
-    
-    
-    # FPS 추가 필요
-    while True:
-        # time check should be here
-        if mode == 'onnx':
-            img = inference_with_onnx(img_batch, model)
-        elif mode == 'torch':
-            img = inference_with_pt(img_batch, model, img_size)
-        # time check end
-        yield (b'--frame\r\n' 
-               b'Content-Type: image/jpeg\r\n\r\n' +
-               img.tobytes() + b'\r\n')
+    fps = img_batch.get(cv2.CAP_PROP_FPS)
 
-        if cv2.waitKey(100) > 0:
+    total_time_st = time.time_ns()
+    while img_batch.isOpened():
+        ret, frame = img_batch.read()
+        if ret:
+            start_ns = time.time_ns()
+            if mode == 'onnx':
+                img = inference_with_onnx(frame, model)
+            elif mode == 'torch':
+                img = inference_with_pt(frame, model, img_size)
+            # time check end
+            end_ns = time.time_ns()
+            print('time :', (end_ns-start_ns) / 1000000, '(ms)')
+            print('FPS', 1 / (end_ns-start_ns) * 1000000000)
+            print('ori_FPS', fps)
+            yield (b'--frame\r\n' 
+                   b'Content-Type: image/jpeg\r\n\r\n' +
+                   img.tobytes() + b'\r\n')
+
+            # 100ms 지연
+            #if cv2.waitKey(100) > 0:
+            #    break
+        else:
+            print('Fail to read  frame!')
             break
-
+    total_time_end = time.time_ns()
+    print('total time :', (total_time_end-total_time_st) / 1000000, '(ms)')
 
 def to_numpy(tensor):
     return tensor.detach().cpu().numpy() if tensor.requires_grad else tensor.cpu().numpy()
 
 
-def inference_with_onnx(img_batch, model):
+def inference_with_onnx(frame, model):
     # CV2 IMAGE / frame.shape : (Height, Width, BGR) >> to RGB img = img[:,:,::-1]
-    ret, frame = img_batch.read()
-
+    frame = cv2.resize(frame, (640, 640), interpolation=cv2.INTER_CUBIC)
     '''
     # JPG to >> 1 3 640 640
     frame_jpg = frame.astype(np.float32)
@@ -105,8 +115,7 @@ def inference_with_onnx(img_batch, model):
     return img
 
 
-def inference_with_pt(img_batch, model, img_size):
-    ret, frame = img_batch.read()
+def inference_with_pt(frame, model, img_size):
     results = model(frame.copy(), size=img_size)
     json_results = results_to_json(results, model)
 
@@ -118,8 +127,6 @@ def inference_with_pt(img_batch, model, img_size):
 # with pytorch
 def results_to_json(results, model):
     # Converts yolo model output to json (list of list of dicts)
-    
-    
     return [
         [
             {
@@ -193,7 +200,7 @@ def non_max_suppression(prediction, conf_thres=0.5, iou_thres=0.6, classes=None,
     # Maximum number of detections per image.
     max_det = 300
 
-    #  Timeout.
+    # Timeout.
     time_limit = 10.0
 
     # Require redundant detections.
@@ -235,33 +242,15 @@ def non_max_suppression(prediction, conf_thres=0.5, iou_thres=0.6, classes=None,
         if multi_label:
             i, j = torch.nonzero(torch.Tensor(x[:, 5:] > conf_thres), as_tuple=False).T
             
-            # print(i.size(), j.size())
-            # i=i.reshape(1,i.size()[0])
-            # j=j.reshape(1,j.size()[0])
-            # print("i값:",i, "j값",j)
-            tmp1=torch.Tensor(box[i])
-            tmp2=torch.Tensor(x[i, j + 5, None])
-            tmp3=j[:, None].float()
-            print(i.size(), j.size())
-            if i.size()[0]==1 and j.size()[0]==1:
-                print("통과!")
-                tmp1=tmp1.reshape(1,tmp1.size()[0])
-                tmp2=tmp2.reshape(1,tmp2.size()[0])
-    
-            # tmp1=torch.Tensor(box[i])
-            # tmp2=torch.Tensor(x[i, j + 5, None])
-            # tmp3=j[:, None].float()
+            bbox = torch.Tensor(box[i])
+            confidence = torch.Tensor(x[i, j + 5, None])
+            class_num = j[:, None].float()
+
+            if i.size(dim=0) == 1 and j.size(dim=0) == 1:
+                bbox = bbox.reshape(1, bbox.size(dim=0))
+                confidence = confidence.reshape(1, confidence.size(dim=0))
             
-            print('tmp1:',tmp1.size())
-            print('tmp2:',tmp2.size())
-            print('tmp3:',tmp3.size())
-            print('concat:',(tmp1,tmp2,tmp3))
-            
-            #print(box)
-            x=torch.cat((tmp1,tmp2,tmp3),1)
-    
-            #x = torch.cat((torch.Tensor(box[i]), torch.Tensor(x[i, j + 5, None]), j[:, None].float()), 1)
-              
+            x = torch.cat((bbox, confidence, class_num), 1)
         else:
             # Best class only.
             conf, j = x[:, 5:].max(1, keepdim=True)
@@ -278,7 +267,7 @@ def non_max_suppression(prediction, conf_thres=0.5, iou_thres=0.6, classes=None,
             continue
 
         # Batched NMS:
-        #  Classes.
+        # Classes.
         c = x[:, 5:6] * (0 if agnostic else max_wh)
 
         # Boxes (offset by class), scores.
