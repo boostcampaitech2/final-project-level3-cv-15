@@ -66,7 +66,7 @@ def non_max_suppression(prediction, conf_thres=0.5, iou_thres=0.6, classes=None,
 
         # Detections matrix nx6 (xyxy, conf, cls).
         if multi_label:
-            i, j = torch.nonzero(torch.Tensor(x[:, 5:] > conf_thres), as_tuple=False).T
+            i, j = torch.nonzero(x[:, 5:] > conf_thres, as_tuple=False).T
 
             bbox = torch.Tensor(box[i])
             confidence = torch.Tensor(x[i, j + 5, None])
@@ -166,10 +166,19 @@ def preprocess(img):
     return img
 
 
-def plot_result_image(json_results, img, colors):
+def plot_result_image(json_results, img, colors, inf_time=None, deepsort=False):
     for bbox_list in json_results:
         for bbox in bbox_list:
-            label = f'{bbox["class_name"]} {bbox["confidence"]:.2f}'
+            if not deepsort:
+                if not inf_time:
+                    label = f'{bbox["class_name"]} {bbox["confidence"]:.2f}'
+                elif inf_time:
+                    label = f'{bbox["class_name"]} {bbox["confidence"]:.2f} Time:{inf_time:.1f}ms'
+            else:
+                if not inf_time:
+                    label = f'{bbox["track_id"]:.0f} {bbox["class_name"]}'
+                elif inf_time:
+                    label = f'{bbox["track_id"]:.0f} {bbox["class_name"]} Time:{inf_time:.1f}ms'
             plot_one_box(bbox['bbox'], img, label=label, color=colors[int(bbox['class'])], line_thickness=3)
 
     return cv2.imencode('.jpg', img)
@@ -198,6 +207,11 @@ def xywh2xyxy(x):
     y[:, 2] = x[:, 0] + x[:, 2] / 2  # bottom right x
     y[:, 3] = x[:, 1] + x[:, 3] / 2  # bottom right y
     return y
+
+
+def xywhToxyxy(arr):
+    # xytl w h to xyxy
+    return [arr[0], arr[1], arr[0]+arr[2], arr[1]+arr[3]]
 
 
 def base64EncodeImage(img):
@@ -234,6 +248,22 @@ def onnx_results_to_json(results, classes):
                 "class_name": classes[int(pred[5])],
                 "bbox": [int(x) for x in pred[:4].tolist()],  # convert bbox results to int from float
                 "confidence": float(pred[4]),
+            }
+            for pred in result
+        ]
+        for result in results
+    ]
+
+
+def deepsort_results_to_json(results, classes):
+    # Converts yolo model output to json (list of list of dicts)
+    return [
+        [
+            {
+                "class": int(pred[5]),
+                "class_name": classes[int(pred[5])],
+                "bbox": [int(x) for x in xywhToxyxy(pred[:4].tolist())],  # convert bbox results to int from float
+                "track_id": float(pred[4]),
             }
             for pred in result
         ]
