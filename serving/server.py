@@ -8,10 +8,10 @@ import cv2
 import numpy as np
 
 import torch
-import base64
 import random
 
-from help_funcs import *
+from realtime_inference import get_stream_cam
+from help_funcs import (base64EncodeImage, results_to_json, plot_one_box)
 
 app = FastAPI()
 templates = Jinja2Templates(directory = 'templates')
@@ -102,7 +102,6 @@ async def detect_via_web_form():
 	Intended for human (non-api) users.
 	Returns: HTML template render showing bbox data and base64 encoded image
 	'''
-
 	return StreamingResponse(get_stream_cam(model_name, img_size), media_type="multipart/x-mixed-replace; boundary=frame")
 
 
