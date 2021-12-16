@@ -35,16 +35,19 @@ def get_stream_cam(model_name: str = Form(...),
     mode = 'onnx_deep'
     model_root = './models/'
 
-    if mode == 'torch':
-        model = torch.hub.load('ultralytics/yolov5', model_name, pretrained=True)
-    elif mode == 'torch_deep':
-        model = torch.hub.load('ultralytics/yolov5', model_name, pretrained=True)
-        ds = DeepSort(os.path.join(model_root, 'ckpt.t7'))
-    elif mode == 'onnx':
+    if mode == 'onnx':
         model = onnxruntime.InferenceSession(os.path.join(model_root, (model_name + '.onnx')))
     elif mode == 'onnx_deep':
         model = onnxruntime.InferenceSession(os.path.join(model_root, (model_name + '.onnx')))
         ds = DeepSort(os.path.join(model_root, 'ckpt.t7'))
+    elif mode == 'torch':
+        model = torch.hub.load('ultralytics/yolov5', model_name, pretrained=True)
+    elif mode == 'torch_deep':
+        model = torch.hub.load('ultralytics/yolov5', model_name, pretrained=True)
+        ds = DeepSort(os.path.join(model_root, 'ckpt.t7'))
+    else:
+        print('not exist mode!! check again!!')
+        return
 
     # Image from Camera no.0
     videos_root = './videos'
@@ -65,10 +68,7 @@ def get_stream_cam(model_name: str = Form(...),
             elif mode == 'torch':
                 img, inf_time = inference_with_pt(frame, model, img_size)
             elif mode == 'torch_deep':
-                img, inf_time = inference_with_pt(frame, model, img_size)
-            else:
-                print('not exist mode!! check again!!')
-                break
+                img, inf_time = inference_with_pt_deepsort(frame, model, img_size, ds)
 
             print('FPS', 1 / inf_time * 1000)
 
@@ -160,11 +160,24 @@ def inference_with_pt(frame, model, img_size):
     return img, inf_time
 
 
-def inference_with_pt_deepsort(frame, model, img_size):
+def inference_with_pt_deepsort(frame, model, img_size, ds):
     start_ns = time.time_ns()
-
+    boxes = []
     results = model(frame.copy(), size=img_size)
-    json_results = results_to_json(results, model)
+
+    for result in results.xyxy:
+        for det in result:
+            det = det.cpu().detach().numpy()
+            x1, y1, x2, y2, score, class_num = det.astype(np.float32)
+            cx = (x1 + x2) // 2
+            cy = (y1 + y2) // 2
+            w = x2 - x1
+            h = y2 - y1
+            boxes.append([cx, cy, w, h, class_num])
+
+    tracked_boxes = ds.update(boxes, frame)
+
+    json_results = deepsort_results_to_json([tracked_boxes], classes=classes)
 
     inf_time = (time.time_ns() - start_ns) / 1000000
 
