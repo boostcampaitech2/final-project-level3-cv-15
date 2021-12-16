@@ -9,7 +9,7 @@ import onnxruntime
 
 import random
 
-from help_funcs import (non_max_suppression, preprocess, mns, plot_result_image, results_to_json, onnx_results_to_json)
+from help_funcs import (non_max_suppression, preprocess, mns, plot_result_image, results_to_json, onnx_results_to_json, deepsort_results_to_json)
 import numpy as np
 
 from tracker.deep_sort import DeepSort
@@ -53,25 +53,24 @@ def get_stream_cam(model_name: str = Form(...),
     fps = img_batch.get(cv2.CAP_PROP_FPS)
 
     total_time_st = time.time_ns()
+    print('ori_FPS', fps)
 
     while img_batch.isOpened():
         ret, frame = img_batch.read()
         if ret:
-            start_ns = time.time_ns()
             if mode == 'onnx':
-                img = inference_with_onnx(frame, model)
+                img, inf_time = inference_with_onnx(frame, model)
             elif mode == 'onnx_deep':
-                img = inference_with_onnx_deepsort(frame, model, ds)
+                img, inf_time = inference_with_onnx_deepsort(frame, model, ds)
             elif mode == 'torch':
-                img = inference_with_pt(frame, model, img_size)
+                img, inf_time = inference_with_pt(frame, model, img_size)
             elif mode == 'torch_deep':
-                img = inference_with_pt(frame, model, img_size)
+                img, inf_time = inference_with_pt(frame, model, img_size)
+            else:
+                print('not exist mode!! check again!!')
+                break
 
-            # time check end
-            end_ns = time.time_ns()
-            print('time :', (end_ns-start_ns) / 1000000, '(ms)')
-            print('FPS', 1 / (end_ns-start_ns) * 1000000000)
-            print('ori_FPS', fps)
+            print('FPS', 1 / inf_time * 1000)
 
             yield (b'--frame\r\n' 
                    b'Content-Type: image/jpeg\r\n\r\n' +
@@ -89,6 +88,7 @@ def get_stream_cam(model_name: str = Form(...),
 
 def inference_with_onnx(frame, model):
     # CV2 IMAGE / frame.shape : (Height, Width, BGR) >> to RGB img = img[:,:,::-1]
+    start_ns = time.time_ns()
     frame = cv2.resize(frame, (640, 640), interpolation=cv2.INTER_CUBIC)
 
     input_data = preprocess(frame)
@@ -97,16 +97,21 @@ def inference_with_onnx(frame, model):
 
     # Inference
     results = model.run([], {input_name: input_data})
-    nmx_results = non_max_suppression(results[0], conf_thres=0.5)[0]  # BATCH SIZE is 1.
+    nmx_results = non_max_suppression(torch.tensor(results[0]), conf_thres=0.5)[0]  # BATCH SIZE is 1.
     json_results = onnx_results_to_json([nmx_results], classes=classes)
 
+    inf_time = (time.time_ns() - start_ns) / 1000000
+
+    #ret, img = plot_result_image(json_results, frame, colors, inf_time=inf_time)
     ret, img = plot_result_image(json_results, frame, colors)
 
-    return img
+    return img, inf_time
 
 
 def inference_with_onnx_deepsort(frame, model, ds):
     # CV2 IMAGE / frame.shape : (Height, Width, BGR) >> to RGB img = img[:,:,::-1]
+    start_ns = time.time_ns()
+
     frame = cv2.resize(frame, (640, 640), interpolation=cv2.INTER_CUBIC)
     input_data = preprocess(frame)
     input_name = model.get_inputs()[0].name
@@ -114,7 +119,7 @@ def inference_with_onnx_deepsort(frame, model, ds):
 
     # Inference
     results = model.run([], {input_name: input_data})
-    dets = mns(
+    dets = non_max_suppression(
         torch.tensor(results[0]),
         conf_thres=0.4,
         iou_thres=0.5
@@ -122,39 +127,48 @@ def inference_with_onnx_deepsort(frame, model, ds):
 
     for det in dets:
         det = det.cpu().detach().numpy()
-        x1, y1, x2, y2, score = det.astype(np.float32)
+        x1, y1, x2, y2, score, class_num = det.astype(np.float32)
         cx = (x1 + x2) // 2
         cy = (y1 + y2) // 2
         w = x2 - x1
         h = y2 - y1
-        boxes.append([cx, cy, w, h])
+        boxes.append([cx, cy, w, h, class_num])
 
     tracked_boxes = ds.update(boxes, frame)
 
-    # class 작업되면 plot_result_image로 바꾸기
-    for bbox in tracked_boxes:
-        x, y, w, h, trk_id = bbox
-        cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 255, 0), 2)
-        cv2.putText(frame, str(trk_id), (x, y), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2, cv2.LINE_AA)
+    json_results = deepsort_results_to_json([tracked_boxes], classes=classes)
 
-    ret, img = cv2.imencode('.jpg', frame)
+    inf_time = (time.time_ns() - start_ns) / 1000000
 
-    return img
+    #ret, img = plot_result_image(json_results, frame, colors, inf_time=inf_time, deepsort=True)
+    ret, img = plot_result_image(json_results, frame, colors, deepsort=True)
+
+    return img, inf_time
 
 
 def inference_with_pt(frame, model, img_size):
+    start_ns = time.time_ns()
+
     results = model(frame.copy(), size=img_size)
     json_results = results_to_json(results, model)
 
+    inf_time = (time.time_ns() - start_ns) / 1000000
+
+    #ret, img = plot_result_image(json_results, frame, colors, inf_time=inf_time)
     ret, img = plot_result_image(json_results, frame, colors)
 
-    return img
+    return img, inf_time
 
 
 def inference_with_pt_deepsort(frame, model, img_size):
+    start_ns = time.time_ns()
+
     results = model(frame.copy(), size=img_size)
     json_results = results_to_json(results, model)
 
-    ret, img = plot_result_image(json_results, frame)
+    inf_time = (time.time_ns() - start_ns) / 1000000
 
-    return img
+    #ret, img = plot_result_image(json_results, frame, colors, inf_time=inf_time, deepsort=True)
+    ret, img = plot_result_image(json_results, frame, colors, deepsort=True)
+
+    return img, inf_time
