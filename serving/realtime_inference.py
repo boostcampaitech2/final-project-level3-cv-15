@@ -12,7 +12,6 @@ import cv2
 
 import torch
 import onnxruntime
-#import Albumentations as A
 import random
 
 from help_funcs import (non_max_suppression, preprocess, mns, plot_result_image, results_to_json, onnx_results_to_json, deepsort_results_to_json)
@@ -47,8 +46,8 @@ def get_stream_cam(model_name: str = Form(...),
     seg_ckpt=os.path.join(model_root,'newset_best_mIoU_epoch_82.pth')
     
     if mode == 'onnx':
-        model = onnxruntime.InferenceSession(os.path.join(model_root, (model_name + '.onnx')))
-    
+        model = onnxruntime.InferenceSession(os.path.join(model_root,'yol5_cls4_best.onnx'))
+        # model = onnxruntime.InferenceSession(os.path.join(model_root, (model_name + '.onnx')))
     elif mode == 'onnx_deep':
         model = onnxruntime.InferenceSession(os.path.join(model_root,'yol5_cls4_best.onnx'))
         ds = DeepSort(os.path.join(model_root, 'ckpt.t7'))
@@ -65,9 +64,12 @@ def get_stream_cam(model_name: str = Form(...),
 
     # Image from Camera no.0
     videos_root = './videos'
-    V = os.path.join(videos_root, 'test_2.mp4')
+    V = os.path.join(videos_root, 'test_3.mp4')
     img_batch = cv2.VideoCapture(V)
     fps = img_batch.get(cv2.CAP_PROP_FPS)
+    
+    #segmentation inference
+    
     ret, frame = img_batch.read()
     approx=seg_inference(config,seg_ckpt,frame)
     
@@ -93,7 +95,10 @@ def get_stream_cam(model_name: str = Form(...),
             yield (b'--frame\r\n' 
                    b'Content-Type: image/jpeg\r\n\r\n' +
                    img.tobytes() + b'\r\n')
-
+           # 100ms 지연
+            #if cv2.waitKey(100) > 0:
+            #    break
+            
         else:
             print('Fail to read  frame!')
             break
@@ -101,10 +106,10 @@ def get_stream_cam(model_name: str = Form(...),
     print('total time :', (total_time_end-total_time_st) / 1000000, '(ms)')
     
     
-    
-    
-    
+    #segmentation polygon 좌표 function
 def seg_inference(config_file,ckpt_model,frame):
+    select=[0] 
+    approx_list=[0]
     start_ns = time.time_ns()
     frame=cv2.resize(frame,(640,640))
     #성민님 모델
@@ -116,12 +121,17 @@ def seg_inference(config_file,ckpt_model,frame):
     for cnt in contours_approx_simple:
         epsilon = 0.02 * cv2.arcLength(cnt, True)
         approx = cv2.approxPolyDP(cnt, epsilon, True)
+
+        a=cv2.contourArea(approx)
+        if a > select[0]:
+            select.pop()
+            approx_list.pop()
+            select.append(a)
+            approx_list.append([approx])
+        else:
+            continue
     return approx
         
-
-   
-   
-
 
 def inference_with_onnx(frame, model):
     # CV2 IMAGE / frame.shape : (Height, Width, BGR) >> to RGB img = img[:,:,::-1]
@@ -222,5 +232,3 @@ def inference_with_pt_deepsort(frame, model, img_size, ds):
     ret, img = plot_result_image(json_results, frame, colors, deepsort=True)
 
     return img, inf_time
-
-
