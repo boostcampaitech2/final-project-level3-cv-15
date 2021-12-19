@@ -167,7 +167,8 @@ def preprocess(img):
 
 
 def plot_result_image(json_results, img, colors, approx, inf_time=None, deepsort=False):
-    cv2.drawContours(img ,[approx],0,(0,255,255),1)
+    if approx.any():
+        cv2.drawContours(img ,[approx],0,(0,255,255),1)
     for bbox_list in json_results:
         for bbox in bbox_list:
             if not deepsort:
