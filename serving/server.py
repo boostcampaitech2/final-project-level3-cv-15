@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Request, Form, File, UploadFile
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -14,6 +15,8 @@ from realtime_inference import get_stream_cam
 from help_funcs import (base64EncodeImage, results_to_json, plot_one_box)
 
 app = FastAPI()
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 templates = Jinja2Templates(directory = 'templates')
 
 model_selection_options = ['yolov5s','yolov5m','yolov5l','yolov5x']
