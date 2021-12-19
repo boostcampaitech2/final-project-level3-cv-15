@@ -21,7 +21,7 @@ def non_max_suppression(prediction, conf_thres=0.5, iou_thres=0.6, classes=None,
 
     # Settings:
     # Minimum and maximum box width and height in pixels.
-    min_wh, max_wh = 2, 4096
+    max_wh =  4096
 
     # Maximum number of detections per image.
     max_det = 300
@@ -166,7 +166,8 @@ def preprocess(img):
     return img
 
 
-def plot_result_image(json_results, img, colors, inf_time=None, deepsort=False):
+def plot_result_image(json_results, img, colors, approx, inf_time=None, deepsort=False):
+    cv2.drawContours(img ,[approx],0,(0,255,255),1)
     for bbox_list in json_results:
         for bbox in bbox_list:
             if not deepsort:
@@ -191,6 +192,8 @@ def plot_one_box(x, im, color=(128, 128, 128), label=None, line_thickness=3):
     tl = line_thickness or round(0.002 * (im.shape[0] + im.shape[1]) / 2) + 1  # line/font thickness
     c1, c2 = (int(x[0]), int(x[1])), (int(x[2]), int(x[3]))
     cv2.rectangle(im, c1, c2, color, thickness=tl, lineType=cv2.LINE_AA)
+    
+    
     if label:
         tf = max(tl - 1, 1)  # font thickness
         t_size = cv2.getTextSize(label, 0, fontScale=tl / 3, thickness=tf)[0]

@@ -2,11 +2,17 @@ import time
 
 from fastapi import Form
 
+
+
+
+from mmseg.apis import init_segmentor, inference_segmentor, show_result_pyplot
+from mmseg.core.evaluation import get_palette
+import matplotlib.pyplot as plt
 import cv2
 
 import torch
 import onnxruntime
-
+#import Albumentations as A
 import random
 
 from help_funcs import (non_max_suppression, preprocess, mns, plot_result_image, results_to_json, onnx_results_to_json, deepsort_results_to_json)
@@ -19,7 +25,7 @@ os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
 model_selection_options = ['yolov5s', 'yolov5m', 'yolov5l', 'yolov5x']
 model_dict = {model_name: None for model_name in model_selection_options}  # set up model cache
-classes = ['person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck', 'boat', 'traffic light', 'fire hydrant', 'stop sign', 'parking meter', 'bench', 'bird', 'cat', 'dog', 'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe', 'backpack', 'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee', 'skis', 'snowboard', 'sports ball', 'kite', 'baseball bat', 'baseball glove', 'skateboard', 'surfboard', 'tennis racket', 'bottle', 'wine glass', 'cup', 'fork', 'knife', 'spoon', 'bowl', 'banana', 'apple', 'sandwich', 'orange', 'broccoli', 'carrot', 'hot dog', 'pizza', 'donut', 'cake', 'chair', 'couch','potted plant', 'bed', 'dining table', 'toilet', 'tv', 'laptop', 'mouse', 'remote', 'keyboard','cell phone','microwave', 'oven', 'toaster', 'sink', 'refrigerator', 'book', 'clock', 'vase', 'scissors', 'teddy bear','hair drier', 'toothbrush']
+classes =['bicycle', 'person', 'stroller', 'wheelchair']
 colors = [tuple([random.randint(0, 255) for _ in range(3)]) for _ in range(100)]  # for bbox plotting
 
 
@@ -34,16 +40,24 @@ def get_stream_cam(model_name: str = Form(...),
     # 하드 코딩 된 부분 >> 인자 받아보게 변경, yaml or from html
     mode = 'onnx_deep'
     model_root = './models/'
-
+    #segmentation model
+    
+    
+    config=os.path.join(model_root,'sm_icnet.py')
+    seg_ckpt=os.path.join(model_root,'newset_best_mIoU_epoch_82.pth')
+    
     if mode == 'onnx':
         model = onnxruntime.InferenceSession(os.path.join(model_root, (model_name + '.onnx')))
+    
     elif mode == 'onnx_deep':
-        model = onnxruntime.InferenceSession(os.path.join(model_root, (model_name + '.onnx')))
+        model = onnxruntime.InferenceSession(os.path.join(model_root,'yol5_cls4_best.onnx'))
         ds = DeepSort(os.path.join(model_root, 'ckpt.t7'))
+    
     elif mode == 'torch':
-        model = torch.hub.load('ultralytics/yolov5', model_name, pretrained=True)
+        model = torch.hub.load('ultralytics/yolov5', 'custom', os.path.join(model_root,'yolov5_s_train_hs.pt'))
+    
     elif mode == 'torch_deep':
-        model = torch.hub.load('ultralytics/yolov5', model_name, pretrained=True)
+        model = torch.hub.load('ultralytics/yolov5', 'custom', os.path.join(model_root,'yolov5_s_train_hs.pt'))
         ds = DeepSort(os.path.join(model_root, 'ckpt.t7'))
     else:
         print('not exist mode!! check again!!')
@@ -54,6 +68,10 @@ def get_stream_cam(model_name: str = Form(...),
     V = os.path.join(videos_root, 'test_2.mp4')
     img_batch = cv2.VideoCapture(V)
     fps = img_batch.get(cv2.CAP_PROP_FPS)
+    ret, frame = img_batch.read()
+    approx=seg_inference(config,seg_ckpt,frame)
+    
+  #print("approx확인:",approx)
 
     total_time_st = time.time_ns()
     print('ori_FPS', fps)
@@ -64,7 +82,7 @@ def get_stream_cam(model_name: str = Form(...),
             if mode == 'onnx':
                 img, inf_time = inference_with_onnx(frame, model)
             elif mode == 'onnx_deep':
-                img, inf_time = inference_with_onnx_deepsort(frame, model, ds)
+                img, inf_time = inference_with_onnx_deepsort(frame, model, ds,approx)
             elif mode == 'torch':
                 img, inf_time = inference_with_pt(frame, model, img_size)
             elif mode == 'torch_deep':
@@ -76,14 +94,33 @@ def get_stream_cam(model_name: str = Form(...),
                    b'Content-Type: image/jpeg\r\n\r\n' +
                    img.tobytes() + b'\r\n')
 
-            # 100ms 지연
-            #if cv2.waitKey(100) > 0:
-            #    break
         else:
             print('Fail to read  frame!')
             break
     total_time_end = time.time_ns()
     print('total time :', (total_time_end-total_time_st) / 1000000, '(ms)')
+    
+    
+    
+    
+    
+def seg_inference(config_file,ckpt_model,frame):
+    start_ns = time.time_ns()
+    frame=cv2.resize(frame,(640,640))
+    #성민님 모델
+    model = init_segmentor(config_file, ckpt_model, device='cpu')
+    result = inference_segmentor(model, frame)
+    result[0]=result[0].astype(np.uint8) #int8, int6 타입으로 변경해야 findContours을 사용가능
+
+    contours_approx_simple, _ = cv2.findContours(result[0], cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    for cnt in contours_approx_simple:
+        epsilon = 0.02 * cv2.arcLength(cnt, True)
+        approx = cv2.approxPolyDP(cnt, epsilon, True)
+    return approx
+        
+
+   
+   
 
 
 def inference_with_onnx(frame, model):
@@ -108,7 +145,7 @@ def inference_with_onnx(frame, model):
     return img, inf_time
 
 
-def inference_with_onnx_deepsort(frame, model, ds):
+def inference_with_onnx_deepsort(frame, model, ds,approx):
     # CV2 IMAGE / frame.shape : (Height, Width, BGR) >> to RGB img = img[:,:,::-1]
     start_ns = time.time_ns()
 
@@ -141,7 +178,7 @@ def inference_with_onnx_deepsort(frame, model, ds):
     inf_time = (time.time_ns() - start_ns) / 1000000
 
     #ret, img = plot_result_image(json_results, frame, colors, inf_time=inf_time, deepsort=True)
-    ret, img = plot_result_image(json_results, frame, colors, deepsort=True)
+    ret, img = plot_result_image(json_results, frame, colors, approx, deepsort=True)
 
     return img, inf_time
 
@@ -185,3 +222,5 @@ def inference_with_pt_deepsort(frame, model, img_size, ds):
     ret, img = plot_result_image(json_results, frame, colors, deepsort=True)
 
     return img, inf_time
+
+
