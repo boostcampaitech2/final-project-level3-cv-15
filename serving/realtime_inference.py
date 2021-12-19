@@ -2,22 +2,18 @@ import time
 
 from fastapi import Form
 
-
-
-
 from mmseg.apis import init_segmentor, inference_segmentor, show_result_pyplot
 from mmseg.core.evaluation import get_palette
-import matplotlib.pyplot as plt
-import cv2
 
+from tracker.deep_sort import DeepSort
+
+import cv2
 import torch
 import onnxruntime
 import random
-
-from help_funcs import (non_max_suppression, preprocess, mns, plot_result_image, results_to_json, onnx_results_to_json, deepsort_results_to_json)
 import numpy as np
 
-from tracker.deep_sort import DeepSort
+from help_funcs import (non_max_suppression, preprocess, mns, plot_result_image, results_to_json, onnx_results_to_json, deepsort_results_to_json, box_idx_in_polygon)
 
 import os
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
@@ -39,12 +35,11 @@ def get_stream_cam(model_name: str = Form(...),
     # 하드 코딩 된 부분 >> 인자 받아보게 변경, yaml or from html
     mode = 'onnx_deep'
     model_root = './models/'
-    #segmentation model
-    
-    
-    config=os.path.join(model_root,'sm_icnet.py')
-    seg_ckpt=os.path.join(model_root,'newset_best_mIoU_epoch_82.pth')
-    
+
+    # segmentation model
+    config = os.path.join(model_root, 'hyuns_bise.py')
+    seg_ckpt = os.path.join(model_root, 'biseNet_best_mIoU2_epoch_268.pth')
+
     if mode == 'onnx':
         model = onnxruntime.InferenceSession(os.path.join(model_root,'yol5_cls4_best.onnx'))
         # model = onnxruntime.InferenceSession(os.path.join(model_root, (model_name + '.onnx')))
@@ -64,16 +59,20 @@ def get_stream_cam(model_name: str = Form(...),
 
     # Image from Camera no.0
     videos_root = './videos'
-    V = os.path.join(videos_root, 'test_3.mp4')
+    V = os.path.join(videos_root, 'test_2.mp4')
     img_batch = cv2.VideoCapture(V)
     fps = img_batch.get(cv2.CAP_PROP_FPS)
     
-    #segmentation inference
-    
+    # segmentation inference
     ret, frame = img_batch.read()
-    approx=seg_inference(config,seg_ckpt,frame)
-    
-  #print("approx확인:",approx)
+    approx, seg_time = seg_inference(config, seg_ckpt, frame)
+
+    if approx == []:
+        print('감지된 횡단 보도가 없습니다! 카메라를 재조정해주세요!')
+        return
+
+    #print("approx확인:",approx)
+    #print("segtime:", seg_time)
 
     total_time_st = time.time_ns()
     print('ori_FPS', fps)
@@ -95,7 +94,7 @@ def get_stream_cam(model_name: str = Form(...),
             yield (b'--frame\r\n' 
                    b'Content-Type: image/jpeg\r\n\r\n' +
                    img.tobytes() + b'\r\n')
-           # 100ms 지연
+            # 100ms 지연
             #if cv2.waitKey(100) > 0:
             #    break
             
@@ -106,23 +105,28 @@ def get_stream_cam(model_name: str = Form(...),
     print('total time :', (total_time_end-total_time_st) / 1000000, '(ms)')
     
     
-    #segmentation polygon 좌표 function
-def seg_inference(config_file,ckpt_model,frame):
-    select=[0] 
-    approx_list=[0]
+# segmentation polygon 좌표 function
+def seg_inference(config_file, ckpt_model, frame):
     start_ns = time.time_ns()
-    frame=cv2.resize(frame,(640,640))
-    #성민님 모델
+
+    select = [0]
+    approx_list = [0]
+    approx = []
+
+    frame = cv2.resize(frame, (640,640))
+
+    # 성민님 모델
     model = init_segmentor(config_file, ckpt_model, device='cpu')
     result = inference_segmentor(model, frame)
-    result[0]=result[0].astype(np.uint8) #int8, int6 타입으로 변경해야 findContours을 사용가능
+    result = result[0].astype(np.uint8) #int8, int6 타입으로 변경해야 findContours을 사용가능
 
-    contours_approx_simple, _ = cv2.findContours(result[0], cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    contours_approx_simple, _ = cv2.findContours(result, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+
     for cnt in contours_approx_simple:
         epsilon = 0.02 * cv2.arcLength(cnt, True)
         approx = cv2.approxPolyDP(cnt, epsilon, True)
+        a = cv2.contourArea(approx)
 
-        a=cv2.contourArea(approx)
         if a > select[0]:
             select.pop()
             approx_list.pop()
@@ -130,7 +134,10 @@ def seg_inference(config_file,ckpt_model,frame):
             approx_list.append([approx])
         else:
             continue
-    return approx
+
+    inf_time = (time.time_ns() - start_ns) / 1000000
+
+    return approx, inf_time
         
 
 def inference_with_onnx(frame, model):
@@ -155,7 +162,7 @@ def inference_with_onnx(frame, model):
     return img, inf_time
 
 
-def inference_with_onnx_deepsort(frame, model, ds,approx):
+def inference_with_onnx_deepsort(frame, model, ds, approx):
     # CV2 IMAGE / frame.shape : (Height, Width, BGR) >> to RGB img = img[:,:,::-1]
     start_ns = time.time_ns()
 
@@ -172,6 +179,9 @@ def inference_with_onnx_deepsort(frame, model, ds,approx):
         iou_thres=0.5
     )[0]
 
+    if dets.size(dim=0) == 0:
+        print('00000000000')
+
     for det in dets:
         det = det.cpu().detach().numpy()
         x1, y1, x2, y2, score, class_num = det.astype(np.float32)
@@ -182,6 +192,9 @@ def inference_with_onnx_deepsort(frame, model, ds,approx):
         boxes.append([cx, cy, w, h, class_num])
 
     tracked_boxes = ds.update(boxes, frame)
+
+    if tracked_boxes != []:
+        box_idx_in_polygon(approx, tracked_boxes)
 
     json_results = deepsort_results_to_json([tracked_boxes], classes=classes)
 
