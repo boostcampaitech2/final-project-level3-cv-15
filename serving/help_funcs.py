@@ -6,6 +6,8 @@ from torchvision.ops import (box_iou, nms)
 import time
 import base64
 
+import matplotlib.path as mplPath
+
 
 def non_max_suppression(prediction, conf_thres=0.5, iou_thres=0.6, classes=None, agnostic=False, labels=()):
     """
@@ -21,7 +23,7 @@ def non_max_suppression(prediction, conf_thres=0.5, iou_thres=0.6, classes=None,
 
     # Settings:
     # Minimum and maximum box width and height in pixels.
-    max_wh =  4096
+    min_wh, max_wh = 2, 4096
 
     # Maximum number of detections per image.
     max_det = 300
@@ -66,6 +68,11 @@ def non_max_suppression(prediction, conf_thres=0.5, iou_thres=0.6, classes=None,
 
         # Detections matrix nx6 (xyxy, conf, cls).
         if multi_label:
+            i, j = (x[:, 5:] > conf_thres).nonzero(as_tuple=False).T
+            x = torch.cat((box[i], x[i, j + 5, None], j[:, None].float()), 1)
+
+            '''
+            # 기존 코드
             i, j = torch.nonzero(x[:, 5:] > conf_thres, as_tuple=False).T
 
             bbox = torch.Tensor(box[i])
@@ -77,6 +84,7 @@ def non_max_suppression(prediction, conf_thres=0.5, iou_thres=0.6, classes=None,
                 confidence = confidence.reshape(1, confidence.size(dim=0))
 
             x = torch.cat((bbox, confidence, class_num), 1)
+            '''
         else:
             # Best class only.
             conf, j = x[:, 5:].max(1, keepdim=True)
@@ -167,8 +175,8 @@ def preprocess(img):
 
 
 def plot_result_image(json_results, img, colors, approx, inf_time=None, deepsort=False):
-    if approx.any():
-        cv2.drawContours(img ,[approx],0,(0,255,255),1)
+    if approx != []:
+        cv2.drawContours(img, [approx], 0, (0, 255, 255), 1)
     for bbox_list in json_results:
         for bbox in bbox_list:
             if not deepsort:
@@ -193,8 +201,7 @@ def plot_one_box(x, im, color=(128, 128, 128), label=None, line_thickness=3):
     tl = line_thickness or round(0.002 * (im.shape[0] + im.shape[1]) / 2) + 1  # line/font thickness
     c1, c2 = (int(x[0]), int(x[1])), (int(x[2]), int(x[3]))
     cv2.rectangle(im, c1, c2, color, thickness=tl, lineType=cv2.LINE_AA)
-    
-    
+
     if label:
         tf = max(tl - 1, 1)  # font thickness
         t_size = cv2.getTextSize(label, 0, fontScale=tl / 3, thickness=tf)[0]
@@ -273,3 +280,12 @@ def deepsort_results_to_json(results, classes):
         ]
         for result in results
     ]
+
+
+# return index of box >> ex) [1,4,6,10]
+def box_idx_in_polygon(approx, bbox_list):
+    # approx >> [[[x,y]], [[x,y]], [[x,y]], [[x,y]]] >> change >> [[x,y], [x,y], [x,y], [x,y],]
+    polygon = mplPath.Path([i[0] for i in approx])
+    idx_list = [idx for idx, box in enumerate(bbox_list) if polygon.contains_point((box[0]+box[2]/2, box[1]+box[3]))]
+
+    return idx_list
