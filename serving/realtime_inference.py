@@ -1,3 +1,4 @@
+import base64
 import time
 
 from fastapi import Form
@@ -21,6 +22,8 @@ os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 model_selection_options = ['yolov5s', 'yolov5m', 'yolov5l', 'yolov5x']
 model_dict = {model_name: None for model_name in model_selection_options}  # set up model cache
 classes =['bicycle', 'person', 'stroller', 'wheelchair']
+
+random.seed(3)
 colors = [tuple([random.randint(0, 255) for _ in range(3)]) for _ in range(100)]  # for bbox plotting
 
 
@@ -83,9 +86,16 @@ def get_stream_cam(model_name: str = Form(...),
 
             print('FPS', 1 / inf_time * 1000)
 
+            '''
             yield (b'--frame\r\n' 
                    b'Content-Type: image/jpeg\r\n\r\n' +
                    img.tobytes() + b'\r\n')
+           '''
+            img_b64 = base64.b64encode(img).decode('utf-8')
+
+            yield {
+                'data': '{"img":"'+img_b64+'","text":"테"}'
+            }
             # 100ms 지연
             #if cv2.waitKey(100) > 0:
             #    break
