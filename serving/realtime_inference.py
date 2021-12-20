@@ -14,7 +14,7 @@ import onnxruntime
 import random
 import numpy as np
 
-from help_funcs import (non_max_suppression, preprocess, plot_result_image, results_to_json)
+from help_funcs import (non_max_suppression, preprocess, plot_result_image, results_to_json, valid_box_idx)
 
 import os
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
@@ -80,9 +80,9 @@ def get_stream_cam(model_name: str = Form(...),
 
         if ret:
             if 'deep' in mode:
-                img, inf_time = inference(frame, img_size, model, approx, mode, ds=ds)
+                img, inf_time, keep_green, inform = inference(frame, img_size, model, approx, mode, ds=ds)
             else:
-                img, inf_time = inference(frame, img_size, model, approx, mode)
+                img, inf_time, keep_green, inform = inference(frame, img_size, model, approx, mode)
 
             print('FPS', 1 / inf_time * 1000)
 
@@ -94,7 +94,7 @@ def get_stream_cam(model_name: str = Form(...),
             img_b64 = base64.b64encode(img).decode('utf-8')
 
             yield {
-                'data': '{"img":"'+img_b64+'","text":"테"}'
+                'data': '{"img":"'+img_b64+'","inform":"'+str(inform)+'","keep_green":"'+keep_green+'"}'
             }
             # 100ms 지연
             #if cv2.waitKey(100) > 0:
@@ -170,13 +170,20 @@ def inference(frame, img_size, model, approx, mode, ds=None):
 
         after valid check => pls make boolean: keep_green
     '''
-
-    json_results = results_to_json([results], classes, mode)
+    idx_list = valid_box_idx(approx, results)
+    if idx_list != []:
+        json_results = results_to_json([results[idx_list]], classes, mode)
+        keep_green = 'true'
+        inform = len(idx_list)
+    else:
+        json_results = results_to_json([results], classes, mode)
+        keep_green = 'false'
+        inform = len(json_results[0])
 
     inf_time = (time.time_ns() - start_ns) / 1000000
     ret, img = plot_result_image(json_results, frame, colors, approx, mode)
 
-    return img, inf_time
+    return img, inf_time, keep_green, inform
 
 
 def deepsort(frame, results, ds):

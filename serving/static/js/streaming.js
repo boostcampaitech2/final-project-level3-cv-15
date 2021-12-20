@@ -1,13 +1,19 @@
-$(document).ready(function(){
-    console.log('stream')
+function streaming(){
+    var traffic = traffic_control()
+
     var source = new EventSource("http://localhost:8000/video_feed");
     source.onmessage = function(event) {
         var data = JSON.parse(event.data)
 
-        //document.getElementById("logs").innerHTML += dat_j['img'] + "<br>";
+        document.getElementById("logs").innerHTML = "box num : "+data.inform + "<br>";
         document.getElementById("streaming").src = "data:image/jpeg;base64, " + data.img;
+
+        if (data.keep_green === 'true')
+            traffic.set_keep_green(true)
+        else
+            traffic.set_keep_green(false)
     };
-})
+}
 
 /*
 window.onload = function () {
