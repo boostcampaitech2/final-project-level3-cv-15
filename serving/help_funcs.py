@@ -6,6 +6,8 @@ from torchvision.ops import (box_iou, nms)
 import time
 import base64
 
+import matplotlib.path as mplPath
+
 
 def non_max_suppression(prediction, conf_thres=0.5, iou_thres=0.6, classes=None, agnostic=False, labels=()):
     """
@@ -66,6 +68,11 @@ def non_max_suppression(prediction, conf_thres=0.5, iou_thres=0.6, classes=None,
 
         # Detections matrix nx6 (xyxy, conf, cls).
         if multi_label:
+            i, j = (x[:, 5:] > conf_thres).nonzero(as_tuple=False).T
+            x = torch.cat((box[i], x[i, j + 5, None], j[:, None].float()), 1)
+
+            '''
+            # 기존 코드
             i, j = torch.nonzero(x[:, 5:] > conf_thres, as_tuple=False).T
 
             bbox = torch.Tensor(box[i])
@@ -77,6 +84,7 @@ def non_max_suppression(prediction, conf_thres=0.5, iou_thres=0.6, classes=None,
                 confidence = confidence.reshape(1, confidence.size(dim=0))
 
             x = torch.cat((bbox, confidence, class_num), 1)
+            '''
         else:
             # Best class only.
             conf, j = x[:, 5:].max(1, keepdim=True)
@@ -166,19 +174,22 @@ def preprocess(img):
     return img
 
 
-def plot_result_image(json_results, img, colors, inf_time=None, deepsort=False):
+def plot_result_image(json_results, img, colors, approx, mode, inf_time=None):
+    if approx != []:
+        cv2.drawContours(img, [approx], 0, (0, 255, 255), 3)
     for bbox_list in json_results:
         for bbox in bbox_list:
-            if not deepsort:
-                if not inf_time:
-                    label = f'{bbox["class_name"]} {bbox["confidence"]:.2f}'
-                elif inf_time:
-                    label = f'{bbox["class_name"]} {bbox["confidence"]:.2f} Time:{inf_time:.1f}ms'
-            else:
+            if 'deep' in mode:
                 if not inf_time:
                     label = f'{bbox["track_id"]:.0f} {bbox["class_name"]}'
                 elif inf_time:
                     label = f'{bbox["track_id"]:.0f} {bbox["class_name"]} Time:{inf_time:.1f}ms'
+            else:
+                if not inf_time:
+                    label = f'{bbox["class_name"]} {bbox["confidence"]:.2f}'
+                elif inf_time:
+                    label = f'{bbox["class_name"]} {bbox["confidence"]:.2f} Time:{inf_time:.1f}ms'
+
             plot_one_box(bbox['bbox'], img, label=label, color=colors[int(bbox['class'])], line_thickness=3)
 
     return cv2.imencode('.jpg', img)
@@ -191,6 +202,7 @@ def plot_one_box(x, im, color=(128, 128, 128), label=None, line_thickness=3):
     tl = line_thickness or round(0.002 * (im.shape[0] + im.shape[1]) / 2) + 1  # line/font thickness
     c1, c2 = (int(x[0]), int(x[1])), (int(x[2]), int(x[3]))
     cv2.rectangle(im, c1, c2, color, thickness=tl, lineType=cv2.LINE_AA)
+
     if label:
         tf = max(tl - 1, 1)  # font thickness
         t_size = cv2.getTextSize(label, 0, fontScale=tl / 3, thickness=tf)[0]
@@ -223,49 +235,60 @@ def base64EncodeImage(img):
 
 
 # with pytorch
-def results_to_json(results, model):
+def results_to_json(results, classes, mode):
     # Converts yolo model output to json (list of list of dicts)
-    return [
-        [
-            {
-                "class": int(pred[5]),
-                "class_name": model.model.names[int(pred[5])],
-                "bbox": [int(x) for x in pred[:4].tolist()],  # convert bbox results to int from float
-                "confidence": float(pred[4]),
-            }
-            for pred in result
+    if 'deep' in mode:
+        return [
+            [
+                {
+                    "class": int(pred[5]),
+                    "class_name": classes[int(pred[5])],
+                    "bbox": [int(x) for x in xywhToxyxy(pred[:4].tolist())],  # convert bbox results to int from float
+                    "track_id": float(pred[4]),
+                }
+                for pred in result
+            ]
+            for result in results
         ]
-        for result in results.xyxy
-    ]
-
-
-def onnx_results_to_json(results, classes):
-    # Converts yolo model output to json (list of list of dicts)
-    return [
-        [
-            {
-                "class": int(pred[5]),
-                "class_name": classes[int(pred[5])],
-                "bbox": [int(x) for x in pred[:4].tolist()],  # convert bbox results to int from float
-                "confidence": float(pred[4]),
-            }
-            for pred in result
+    else:
+        return [
+            [
+                {
+                    "class": int(pred[5]),
+                    "class_name": classes[int(pred[5])],
+                    "bbox": [int(x) for x in pred[:4].tolist()],  # convert bbox results to int from float
+                    "confidence": float(pred[4]),
+                }
+                for pred in result
+            ]
+            for result in results
         ]
-        for result in results
-    ]
 
 
-def deepsort_results_to_json(results, classes):
-    # Converts yolo model output to json (list of list of dicts)
-    return [
-        [
-            {
-                "class": int(pred[5]),
-                "class_name": classes[int(pred[5])],
-                "bbox": [int(x) for x in xywhToxyxy(pred[:4].tolist())],  # convert bbox results to int from float
-                "track_id": float(pred[4]),
-            }
-            for pred in result
-        ]
-        for result in results
-    ]
+def valid_box_idx(approx, bbox_list):
+    '''
+        TODO:
+        현재 poly로만 convert,,,
+
+        1. roi_box : 횡단보도의 가운데 영역을 정해야됨...
+        2. return 값인 idx_list의 길이를 통해서
+           traffic_control.js가 사용 할 boolen keep_green 값을 정할 수 있다. => 그릴 때 박스 거르기 가능
+
+        return idx_list >> box_list[idx_list] 이렇게하면 다른 곳에서 필요한 박스만 쓸수 있음
+    '''
+    roi_box = mplPath.Path([i[0] for i in approx])
+
+    idx_list = [idx for idx, box in enumerate(bbox_list) if (is_in_polygon(roi_box, box) & is_wheelchair(box))]
+
+    return idx_list
+
+
+# return index of box >> ex) [1,4,6,10]
+def is_in_polygon(polygon, box):
+    # approx >> [[[x,y]], [[x,y]], [[x,y]], [[x,y]]] >> change >> [[x,y], [x,y], [x,y], [x,y],]
+    #idx_list = [idx for idx, box in enumerate(bbox_list) if polygon.contains_point((box[0]+box[2]/2, box[1]+box[3]))]
+    return polygon.contains_point((box[0]+box[2]/2, box[1]+box[3]))
+
+
+def is_wheelchair(box):
+    return True if box[5] == 3 else False

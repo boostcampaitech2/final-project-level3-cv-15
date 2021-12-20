@@ -24,14 +24,18 @@ class DeepSort(object):
         self.tracker = Tracker(metric, max_iou_distance=max_iou_distance, max_age=max_age, n_init=n_init)
 
     def update(self, box, ori_img):
-        box = np.array(box)
-        bbox_xywh = box[:, 0:4]
-        class_num = box[:, 4:5]
         self.height, self.width = ori_img.shape[:2]
-        # generate detections
-        features = self._get_features(bbox_xywh, ori_img)
-        bbox_tlwh = self._xywh_to_tlwh(np.array(bbox_xywh))
-        detections = [Detection(bbox_tlwh[i], class_num[i], features[i]) for i, box in enumerate(bbox_xywh)]
+        detections = []
+        if len(box) > 0:
+            box = np.array(box)
+            bbox_xywh = box[:, 0:4]
+            class_num = box[:, 4:5]
+
+            # generate detections
+            features = self._get_features(bbox_xywh, ori_img)
+            bbox_tlwh = self._xywh_to_tlwh(np.array(bbox_xywh))
+
+            detections = [Detection(bbox_tlwh[i], class_num[i], features[i]) for i, box in enumerate(bbox_xywh)]
 
         # update tracker
         self.tracker.predict()
