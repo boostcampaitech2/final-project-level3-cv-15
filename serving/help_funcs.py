@@ -265,10 +265,30 @@ def results_to_json(results, classes, mode):
         ]
 
 
-# return index of box >> ex) [1,4,6,10]
-def box_idx_in_polygon(approx, bbox_list):
-    # approx >> [[[x,y]], [[x,y]], [[x,y]], [[x,y]]] >> change >> [[x,y], [x,y], [x,y], [x,y],]
-    polygon = mplPath.Path([i[0] for i in approx])
-    idx_list = [idx for idx, box in enumerate(bbox_list) if polygon.contains_point((box[0]+box[2]/2, box[1]+box[3]))]
+def valid_box_idx(approx, bbox_list):
+    '''
+        TODO:
+        현재 poly로만 convert,,,
+
+        1. roi_box : 횡단보도의 가운데 영역을 정해야됨...
+        2. return 값인 idx_list의 길이를 통해서
+           traffic_control.js가 사용 할 boolen keep_green 값을 정할 수 있다. => 그릴 때 박스 거르기 가능
+
+        return idx_list >> box_list[idx_list] 이렇게하면 다른 곳에서 필요한 박스만 쓸수 있음
+    '''
+    roi_box = mplPath.Path([i[0] for i in approx])
+
+    idx_list = [idx for idx, box in enumerate(bbox_list) if (is_in_polygon(roi_box, box) & is_wheelchair(box))]
 
     return idx_list
+
+
+# return index of box >> ex) [1,4,6,10]
+def is_in_polygon(polygon, box):
+    # approx >> [[[x,y]], [[x,y]], [[x,y]], [[x,y]]] >> change >> [[x,y], [x,y], [x,y], [x,y],]
+    #idx_list = [idx for idx, box in enumerate(bbox_list) if polygon.contains_point((box[0]+box[2]/2, box[1]+box[3]))]
+    return polygon.contains_point((box[0]+box[2]/2, box[1]+box[3]))
+
+
+def is_wheelchair(box):
+    return True if box[5] == 3 else False
