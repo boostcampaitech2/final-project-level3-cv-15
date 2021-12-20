@@ -6,6 +6,8 @@ from torchvision.ops import (box_iou, nms)
 import time
 import base64
 
+import matplotlib.path as mplPath
+
 
 def non_max_suppression(prediction, conf_thres=0.5, iou_thres=0.6, classes=None, agnostic=False, labels=()):
     """
@@ -21,7 +23,7 @@ def non_max_suppression(prediction, conf_thres=0.5, iou_thres=0.6, classes=None,
 
     # Settings:
     # Minimum and maximum box width and height in pixels.
-    max_wh =  4096
+    min_wh, max_wh = 2, 4096
 
     # Maximum number of detections per image.
     max_det = 300
@@ -66,6 +68,11 @@ def non_max_suppression(prediction, conf_thres=0.5, iou_thres=0.6, classes=None,
 
         # Detections matrix nx6 (xyxy, conf, cls).
         if multi_label:
+            i, j = (x[:, 5:] > conf_thres).nonzero(as_tuple=False).T
+            x = torch.cat((box[i], x[i, j + 5, None], j[:, None].float()), 1)
+
+            '''
+            # 기존 코드
             i, j = torch.nonzero(x[:, 5:] > conf_thres, as_tuple=False).T
 
             bbox = torch.Tensor(box[i])
@@ -77,6 +84,7 @@ def non_max_suppression(prediction, conf_thres=0.5, iou_thres=0.6, classes=None,
                 confidence = confidence.reshape(1, confidence.size(dim=0))
 
             x = torch.cat((bbox, confidence, class_num), 1)
+            '''
         else:
             # Best class only.
             conf, j = x[:, 5:].max(1, keepdim=True)
@@ -166,21 +174,22 @@ def preprocess(img):
     return img
 
 
-def plot_result_image(json_results, img, colors, approx, inf_time=None, deepsort=False):
-    if approx.any():
-        cv2.drawContours(img ,[approx],0,(0,255,255),1)
+def plot_result_image(json_results, img, colors, approx, mode, inf_time=None):
+    if approx != []:
+        cv2.drawContours(img, [approx], 0, (0, 255, 255), 3)
     for bbox_list in json_results:
         for bbox in bbox_list:
-            if not deepsort:
-                if not inf_time:
-                    label = f'{bbox["class_name"]} {bbox["confidence"]:.2f}'
-                elif inf_time:
-                    label = f'{bbox["class_name"]} {bbox["confidence"]:.2f} Time:{inf_time:.1f}ms'
-            else:
+            if 'deep' in mode:
                 if not inf_time:
                     label = f'{bbox["track_id"]:.0f} {bbox["class_name"]}'
                 elif inf_time:
                     label = f'{bbox["track_id"]:.0f} {bbox["class_name"]} Time:{inf_time:.1f}ms'
+            else:
+                if not inf_time:
+                    label = f'{bbox["class_name"]} {bbox["confidence"]:.2f}'
+                elif inf_time:
+                    label = f'{bbox["class_name"]} {bbox["confidence"]:.2f} Time:{inf_time:.1f}ms'
+
             plot_one_box(bbox['bbox'], img, label=label, color=colors[int(bbox['class'])], line_thickness=3)
 
     return cv2.imencode('.jpg', img)
@@ -193,8 +202,7 @@ def plot_one_box(x, im, color=(128, 128, 128), label=None, line_thickness=3):
     tl = line_thickness or round(0.002 * (im.shape[0] + im.shape[1]) / 2) + 1  # line/font thickness
     c1, c2 = (int(x[0]), int(x[1])), (int(x[2]), int(x[3]))
     cv2.rectangle(im, c1, c2, color, thickness=tl, lineType=cv2.LINE_AA)
-    
-    
+
     if label:
         tf = max(tl - 1, 1)  # font thickness
         t_size = cv2.getTextSize(label, 0, fontScale=tl / 3, thickness=tf)[0]
@@ -227,49 +235,40 @@ def base64EncodeImage(img):
 
 
 # with pytorch
-def results_to_json(results, model):
+def results_to_json(results, classes, mode):
     # Converts yolo model output to json (list of list of dicts)
-    return [
-        [
-            {
-                "class": int(pred[5]),
-                "class_name": model.model.names[int(pred[5])],
-                "bbox": [int(x) for x in pred[:4].tolist()],  # convert bbox results to int from float
-                "confidence": float(pred[4]),
-            }
-            for pred in result
+    if 'deep' in mode:
+        return [
+            [
+                {
+                    "class": int(pred[5]),
+                    "class_name": classes[int(pred[5])],
+                    "bbox": [int(x) for x in xywhToxyxy(pred[:4].tolist())],  # convert bbox results to int from float
+                    "track_id": float(pred[4]),
+                }
+                for pred in result
+            ]
+            for result in results
         ]
-        for result in results.xyxy
-    ]
-
-
-def onnx_results_to_json(results, classes):
-    # Converts yolo model output to json (list of list of dicts)
-    return [
-        [
-            {
-                "class": int(pred[5]),
-                "class_name": classes[int(pred[5])],
-                "bbox": [int(x) for x in pred[:4].tolist()],  # convert bbox results to int from float
-                "confidence": float(pred[4]),
-            }
-            for pred in result
+    else:
+        return [
+            [
+                {
+                    "class": int(pred[5]),
+                    "class_name": classes[int(pred[5])],
+                    "bbox": [int(x) for x in pred[:4].tolist()],  # convert bbox results to int from float
+                    "confidence": float(pred[4]),
+                }
+                for pred in result
+            ]
+            for result in results
         ]
-        for result in results
-    ]
 
 
-def deepsort_results_to_json(results, classes):
-    # Converts yolo model output to json (list of list of dicts)
-    return [
-        [
-            {
-                "class": int(pred[5]),
-                "class_name": classes[int(pred[5])],
-                "bbox": [int(x) for x in xywhToxyxy(pred[:4].tolist())],  # convert bbox results to int from float
-                "track_id": float(pred[4]),
-            }
-            for pred in result
-        ]
-        for result in results
-    ]
+# return index of box >> ex) [1,4,6,10]
+def box_idx_in_polygon(approx, bbox_list):
+    # approx >> [[[x,y]], [[x,y]], [[x,y]], [[x,y]]] >> change >> [[x,y], [x,y], [x,y], [x,y],]
+    polygon = mplPath.Path([i[0] for i in approx])
+    idx_list = [idx for idx, box in enumerate(bbox_list) if polygon.contains_point((box[0]+box[2]/2, box[1]+box[3]))]
+
+    return idx_list
