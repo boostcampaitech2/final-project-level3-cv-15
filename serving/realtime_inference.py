@@ -154,6 +154,13 @@ def inference(frame, img_size, model, approx, mode, ds=None):
     if 'deep' in mode:
         results = deepsort(frame, results, ds)
 
+    '''
+        TODO:
+        valid check should be here
+
+        after valid check => pls make boolean: keep_green
+    '''
+
     json_results = results_to_json([results], classes, mode)
 
     inf_time = (time.time_ns() - start_ns) / 1000000
