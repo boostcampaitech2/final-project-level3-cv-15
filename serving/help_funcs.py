@@ -174,21 +174,22 @@ def preprocess(img):
     return img
 
 
-def plot_result_image(json_results, img, colors, approx, inf_time=None, deepsort=False):
+def plot_result_image(json_results, img, colors, approx, mode, inf_time=None):
     if approx != []:
-        cv2.drawContours(img, [approx], 0, (0, 255, 255), 1)
+        cv2.drawContours(img, [approx], 0, (0, 255, 255), 3)
     for bbox_list in json_results:
         for bbox in bbox_list:
-            if not deepsort:
-                if not inf_time:
-                    label = f'{bbox["class_name"]} {bbox["confidence"]:.2f}'
-                elif inf_time:
-                    label = f'{bbox["class_name"]} {bbox["confidence"]:.2f} Time:{inf_time:.1f}ms'
-            else:
+            if 'deep' in mode:
                 if not inf_time:
                     label = f'{bbox["track_id"]:.0f} {bbox["class_name"]}'
                 elif inf_time:
                     label = f'{bbox["track_id"]:.0f} {bbox["class_name"]} Time:{inf_time:.1f}ms'
+            else:
+                if not inf_time:
+                    label = f'{bbox["class_name"]} {bbox["confidence"]:.2f}'
+                elif inf_time:
+                    label = f'{bbox["class_name"]} {bbox["confidence"]:.2f} Time:{inf_time:.1f}ms'
+
             plot_one_box(bbox['bbox'], img, label=label, color=colors[int(bbox['class'])], line_thickness=3)
 
     return cv2.imencode('.jpg', img)
@@ -234,52 +235,34 @@ def base64EncodeImage(img):
 
 
 # with pytorch
-def results_to_json(results, model):
+def results_to_json(results, classes, mode):
     # Converts yolo model output to json (list of list of dicts)
-    return [
-        [
-            {
-                "class": int(pred[5]),
-                "class_name": model.model.names[int(pred[5])],
-                "bbox": [int(x) for x in pred[:4].tolist()],  # convert bbox results to int from float
-                "confidence": float(pred[4]),
-            }
-            for pred in result
+    if 'deep' in mode:
+        return [
+            [
+                {
+                    "class": int(pred[5]),
+                    "class_name": classes[int(pred[5])],
+                    "bbox": [int(x) for x in xywhToxyxy(pred[:4].tolist())],  # convert bbox results to int from float
+                    "track_id": float(pred[4]),
+                }
+                for pred in result
+            ]
+            for result in results
         ]
-        for result in results.xyxy
-    ]
-
-
-def onnx_results_to_json(results, classes):
-    # Converts yolo model output to json (list of list of dicts)
-    return [
-        [
-            {
-                "class": int(pred[5]),
-                "class_name": classes[int(pred[5])],
-                "bbox": [int(x) for x in pred[:4].tolist()],  # convert bbox results to int from float
-                "confidence": float(pred[4]),
-            }
-            for pred in result
+    else:
+        return [
+            [
+                {
+                    "class": int(pred[5]),
+                    "class_name": classes[int(pred[5])],
+                    "bbox": [int(x) for x in pred[:4].tolist()],  # convert bbox results to int from float
+                    "confidence": float(pred[4]),
+                }
+                for pred in result
+            ]
+            for result in results
         ]
-        for result in results
-    ]
-
-
-def deepsort_results_to_json(results, classes):
-    # Converts yolo model output to json (list of list of dicts)
-    return [
-        [
-            {
-                "class": int(pred[5]),
-                "class_name": classes[int(pred[5])],
-                "bbox": [int(x) for x in xywhToxyxy(pred[:4].tolist())],  # convert bbox results to int from float
-                "track_id": float(pred[4]),
-            }
-            for pred in result
-        ]
-        for result in results
-    ]
 
 
 # return index of box >> ex) [1,4,6,10]
