@@ -5,6 +5,8 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List, Optional
 
+from sse_starlette.sse import EventSourceResponse
+
 import cv2
 import numpy as np
 
@@ -108,7 +110,8 @@ async def detect_via_web_form():
 	Intended for human (non-api) users.
 	Returns: HTML template render showing bbox data and base64 encoded image
 	'''
-	return StreamingResponse(get_stream_cam(model_name, img_size, mode), media_type="multipart/x-mixed-replace; boundary=frame")
+	#return StreamingResponse(get_stream_cam(model_name, img_size, mode), media_type="multipart/x-mixed-replace; boundary=frame")
+	return EventSourceResponse(get_stream_cam(model_name, img_size, mode))
 
 
 @app.post("/detect/")
