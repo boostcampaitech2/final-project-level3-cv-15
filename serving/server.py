@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Request, Form, File, UploadFile
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -14,6 +15,8 @@ from realtime_inference import get_stream_cam
 from help_funcs import (base64EncodeImage, results_to_json, plot_one_box)
 
 app = FastAPI()
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 templates = Jinja2Templates(directory = 'templates')
 
 model_selection_options = ['yolov5s','yolov5m','yolov5l','yolov5x']
@@ -95,14 +98,17 @@ async def detect_via_web_form(request: Request,
 
 @app.get("/video_feed")
 async def detect_via_web_form():
-	model_name = 'yolov5s'
+	# 하드 코딩 된 부분 >> 인자 받아보게 변경, yaml or from html
+	#model_name = 'yol5_cls4_best'
+	model_name = 'sm_yolov5n_t1'
 	img_size = 640
+	mode = 'torch_deep'
 	'''
 	Requires an image file upload, model name (ex. yolov5s). Optional image size parameter (Default 640).
 	Intended for human (non-api) users.
 	Returns: HTML template render showing bbox data and base64 encoded image
 	'''
-	return StreamingResponse(get_stream_cam(model_name, img_size), media_type="multipart/x-mixed-replace; boundary=frame")
+	return StreamingResponse(get_stream_cam(model_name, img_size, mode), media_type="multipart/x-mixed-replace; boundary=frame")
 
 
 @app.post("/detect/")
