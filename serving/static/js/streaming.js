@@ -3,6 +3,7 @@ function streaming(){
 
     var source = new EventSource("http://localhost:8000/video_feed");
     source.onmessage = function(event) {
+        console.log(event.data)
         var data = JSON.parse(event.data)
 
         document.getElementById("logs").innerHTML = "box num : "+data.inform + "<br>";
@@ -12,6 +13,11 @@ function streaming(){
             traffic.set_keep_green(true)
         else
             traffic.set_keep_green(false)
+
+        if (data.not_keep_red === 'true')
+            traffic.set_keep_red(false)
+        else
+            traffic.set_keep_red(true)
     };
 }
 

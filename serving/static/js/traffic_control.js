@@ -8,6 +8,7 @@ var traffic_control = function(){
     var time = red_time
 
     var keep_green = false
+    var keep_red = false
 
     // 강제 신호 변화 버튼
     $("#set_red").click(function(){
@@ -26,7 +27,7 @@ var traffic_control = function(){
     });
 
     function clock() {
-        if (time < 0 && is_red) set_green()
+        if (time < 0 && is_red && !keep_red) set_green()
         else if (time < 0) set_red()
 
         if (!(keep_green && !is_red && time<1)) show_left_time(time--)
@@ -57,6 +58,10 @@ var traffic_control = function(){
     return {
         set_keep_green: function (bool) {
             keep_green = bool
+        },
+
+        set_keep_red: function (bool) {
+            keep_red = bool
         }
     }
 }
