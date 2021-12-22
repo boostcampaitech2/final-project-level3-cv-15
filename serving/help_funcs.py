@@ -174,9 +174,10 @@ def preprocess(img):
     return img
 
 
-def plot_result_image(json_results, img, colors, approx, mode, inf_time=None):
+def plot_result_image(json_results, img, colors, approx, big_approx, mode, inf_time=None):
     if approx != []:
         cv2.drawContours(img, [approx], 0, (0, 255, 255), 3)
+        cv2.drawContours(img, [big_approx], 0, (255, 128, 0), 3)
     for bbox_list in json_results:
         for bbox in bbox_list:
             if 'deep' in mode:
@@ -265,7 +266,7 @@ def results_to_json(results, classes, mode):
         ]
 
 
-def valid_box_idx(approx, bbox_list):
+def valid_box_idx(approx, bbox_list, is_origin):
     '''
         TODO:
         현재 poly로만 convert,,,
@@ -278,9 +279,14 @@ def valid_box_idx(approx, bbox_list):
     '''
     roi_box = mplPath.Path([i[0] for i in approx])
 
-    idx_list = [idx for idx, box in enumerate(bbox_list) if (is_in_polygon(roi_box, box) & is_wheelchair(box))]
+    if is_origin:
+        idx_list = [idx for idx, box in enumerate(bbox_list) if (is_in_polygon(roi_box, box) & (is_wheelchair(box) | is_stroller(box)))]
+    else:
+        idx_list = [idx for idx, box in enumerate(bbox_list) if (is_in_polygon(roi_box, box) & (is_wheelchair(box) | is_stroller(box) | is_person(box)))]
 
-    return idx_list
+    ret = 'true' if idx_list != [] else 'false'
+
+    return ret, idx_list
 
 
 # return index of box >> ex) [1,4,6,10]
@@ -292,3 +298,34 @@ def is_in_polygon(polygon, box):
 
 def is_wheelchair(box):
     return True if box[5] == 3 else False
+
+
+def is_stroller(box):
+    return True if box[5] == 2 else False
+
+
+def is_person(box):
+    return True if box[5] == 1 else False
+
+
+def approx_big(approx, size, ratio):
+    M = cv2.moments(approx)
+
+    cx = M['m10'] / M['m00']
+    cy = M['m01'] / M['m00']
+
+    big_approx = [[[
+        int(chk_max_min((i[0][0] - cx) * (ratio - 1) + i[0][0], size[0])),
+        int(chk_max_min((i[0][1] - cy) * (ratio - 1) + i[0][1], size[1]))
+    ]] for i in approx]
+
+    return np.array(big_approx)
+
+
+def chk_max_min(x, size):
+    if x < 0:
+        return 0
+    elif x > size:
+        return size
+    else:
+        return x
