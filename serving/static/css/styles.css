@@ -1,0 +1,315 @@
+main{
+    display:flex;
+    flex-direction: column;
+    width: 80%;
+    /* background-color: rgb(32, 155, 192); */
+}
+
+header{
+    background-color: green;
+}
+
+#video-info{
+    /* background-color: yellowgreen; */
+    display: flex;
+    justify-content: left;
+    margin-bottom: 20px;
+    width: 100%;
+    height: 80%;
+}
+
+.video-info__name{
+    width: 650px;
+    height: 100%;
+}
+
+.video-info__name > h3{
+    text-align: center;
+}
+
+.video-info__disp{
+    position: relative;
+    width: 65%;
+    display: flex;
+    padding-top: 60px;
+    padding-bottom: 20px;
+}
+
+.video-info__display, .video-info__input{
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    background-color: black;
+    align-items: center;
+    width: 30%;
+    height: 100%;   
+    margin-left: 5%;
+    padding: 10px;
+    border-radius: 20px;
+}
+
+.video-info__display-name {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: absolute;
+    background-color: rgb(68, 55, 55);
+    width: 150px;
+    height: 80px;
+    top: 5%;
+    border-radius: 20px;
+    font-size: 30px;
+    font-weight: bold;
+    box-shadow: black 5px 5px;
+}
+
+
+.video-info__display-img{
+    font-size: 80px;
+    width: 90%;
+    height: 60%;
+    background-color: grey;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.traffic-red{
+    border-radius: 20px;
+    margin: 20px;
+    background-color: grey;
+}
+.traffic-green{
+    border-radius: 20px;
+    margin: 20px;
+    background-color: grey;
+}
+
+.video-info__display-text{
+    height: 40%;
+    width: 90%;
+    background-color: #88dd6f;
+    align-items: center;
+    padding-top: 30px;
+    border-radius: 20px;
+    margin: 20px
+}
+
+.traffic-text{
+    background-color: grey;
+}
+
+
+.video-info__display p{
+    color: rgb(255, 255, 255);
+    margin: 0px;
+    text-align: center;
+    font-size: 30px;
+    padding-left: 30px;
+    padding-right: 30px;
+}
+
+.video-info__display p:nth-child(1){
+    border-radius: 20px 20px 0px 0px;
+}
+
+.video-info__display p:nth-child(2){
+    border-radius: 0px 0px 20px 20px;
+}
+
+.video-info__input input{
+    height: 200px;
+    width: 90%;
+    border-radius: 20px;
+    margin-top: 20px;
+    margin-bottom: 20px;
+    margin-left: 5%;
+    font-size: 40px;
+    text-align: center;
+}
+
+.video-info__input .video-info__input-rsec input{
+    background-color: rgb(223, 58, 58);
+}
+
+.video-info__input .video-info__input-gsec input{
+    background-color: rgb(53, 218, 103);
+}
+
+
+.video-info__input-btn{
+    font-size: 30px;
+    width: 90%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+
+.video-info__input-btn-primary{
+    background-color: white;
+    height: 150px;
+    /* width: 309px; */
+    width: 100%;
+    display: flex;
+    /* justify-content: space-between; */
+    align-items: center;
+    border-radius: 10px;
+    margin-bottom: 20px;
+}
+
+
+.video-info__input-btn-primary button{
+    all: unset;
+    /* align-items: center; */
+    font-size: 40px;
+    font-weight: 30px;
+    text-align: center;
+    margin-left: 7%;
+    background-color: rgb(151, 147, 147);
+    border-radius: 20px;
+    width: 40%;
+    height: 70px;
+    box-shadow: 5px 5px;
+    cursor: pointer;
+    box-shadow: black 4px 4px;
+}
+
+
+.video-info__input-btn-primary button:active {
+    transform: scale(0.98);
+    /* Scaling button to 0.98 to its original size */
+    box-shadow: 3px 2px 22px 1px rgba(0, 0, 0, 0.24);
+    /* Lowering the shadow */
+}
+
+
+
+.user{
+    display: flex;
+    /* justify-content: space-between; */
+    height: 100%;
+    width: 100%;
+}
+.user-log{
+    display: flex;
+    justify-content: space-between;
+    width: 690px;
+    /* background-color: gray; */
+}
+
+.user-log :nth-child(1){
+    background-color: gray;
+    width: 230px;
+    overflow: hidden;
+    word-wrap:break-word;
+    padding-left: 7px;
+    padding-top: 7px;
+    border-radius: 20px;
+    margin-right: 1%;
+}
+
+.user-log :nth-child(2){
+    background-color: gray;
+    width: 230px;
+    overflow: hidden;
+    word-wrap:break-word;
+    padding-left: 7px;
+    padding-top: 7px;
+    border-radius: 20px;
+    margin-right: 1%;
+    
+}
+
+.user-log :nth-child(3){
+    background-color: gray;
+    width: 230px;
+    overflow: hidden;
+    word-wrap:break-word;
+    padding-left: 7px;
+    padding-top: 7px;
+    border-radius: 20px;    
+}
+
+.user_btn{
+    display: flex;
+    width: 62%;
+}
+
+.user_btn form, .user_btn > button{
+    width: 30%;
+    font-size: 20px;
+    height: 100%;
+    margin-left: 6%;
+    display: flex;
+    align-items: center;
+    text-align: center;
+    border-radius: 20px;
+}
+
+.user_btn form > button{
+    all:unset;
+    width: 70px;
+    height: 50px;
+    margin-left: 7%;
+    background-color: cadetblue;
+    border-radius: 20px;
+    box-shadow: black 2px 2px;
+    cursor: pointer;
+    outline: none;
+    transition: 0.2s all;
+}
+
+.user_btn form > button:active{
+    transform: scale(0.98);
+    /* Scaling button to 0.98 to its original size */
+    box-shadow: 3px 2px 22px 1px rgba(0, 0, 0, 0.24);
+    /* Lowering the shadow */
+}
+
+.mb-3{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: rgb(60, 202, 188);
+    height: 70px;
+    width: 200px;
+    border-radius: 20px;
+    box-shadow: black 5px 5px;
+    cursor: pointer;
+    outline: none;
+    transition: 0.2s all;
+}
+
+.mb-3:active {
+    transform: scale(0.98);
+    /* Scaling button to 0.98 to its original size */
+    box-shadow: 3px 2px 22px 1px rgba(0, 0, 0, 0.24);
+    /* Lowering the shadow */
+}
+
+.user_btn input{
+    display: none;
+}
+
+.user_btn > button{
+    all:unset;
+    background-color: rgb(65, 65, 161);
+    font-size: 20px;
+    width: 25%;
+    margin-left: 7%;
+    text-align: center;
+    border-radius: 20px;
+    box-shadow: black 5px 5px;
+    cursor: pointer;
+    outline: none;
+    transition: 0.2s all;
+}
+
+.user_btn > button:active {
+    transform: scale(0.98);
+    /* Scaling button to 0.98 to its original size */
+    box-shadow: 3px 2px 22px 1px rgba(0, 0, 0, 0.24);
+    /* Lowering the shadow */
+}
