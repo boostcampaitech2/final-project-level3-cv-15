@@ -79,30 +79,14 @@
     </div>
 
     <div class="user_btn">
-      <form method="post" action="" enctype="multipart/form-data">
+      <form method="post" id="form-id" action="video_feed" enctype="multipart/form-data">
         <div class="mb-3">
           <label class="form-label" for="file_list">
             Upload Videos
           </label>
           <input class="form-control w-auto" type="file" name="file_list" id="file_list" multiple />
         </div>
-      <!--
-        <div class="mb-3">
-          <div class="form-group">
-            <label>Select YOLO Model</label>
-          </div>
-          <select class="form-select w-auto" name="model_name">
-            {% for selection in model_selection_options %}
-              <option value="{{ selection }}">{{ selection }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="mb-3">
-          <label for="img_size_input" class="form-label">Model Inference Size</label>
-          <input type="text" class="form-control w-auto" id="img_size_input" name="img_size" value="640">
-        </div>
-      -->
-        <button class="btn btn-primary" type="submit">Submit</button>
+        <button id="btn_submit" class="btn btn-primary">Submit</button>
       </form>
 
       <button id="btn_stream" class="btn btn-primary">stream start</button>
