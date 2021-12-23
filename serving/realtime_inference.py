@@ -1,3 +1,4 @@
+import base64
 import time
 
 from fastapi import Form
@@ -13,7 +14,7 @@ import onnxruntime
 import random
 import numpy as np
 
-from help_funcs import (non_max_suppression, preprocess, plot_result_image, results_to_json)
+from help_funcs import (non_max_suppression, preprocess, plot_result_image, results_to_json, valid_box_idx, approx_big)
 
 import os
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
@@ -21,6 +22,8 @@ os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 model_selection_options = ['yolov5s', 'yolov5m', 'yolov5l', 'yolov5x']
 model_dict = {model_name: None for model_name in model_selection_options}  # set up model cache
 classes =['bicycle', 'person', 'stroller', 'wheelchair']
+
+random.seed(3)
 colors = [tuple([random.randint(0, 255) for _ in range(3)]) for _ in range(100)]  # for bbox plotting
 
 
@@ -53,14 +56,14 @@ def get_stream_cam(model_name: str = Form(...),
 
     # Image from Camera no.0
     videos_root = './videos'
-    V = os.path.join(videos_root, 'test_1.mp4')
+    V = os.path.join(videos_root, 'jy01.mp4')
     img_batch = cv2.VideoCapture(V)
 
     fps = img_batch.get(cv2.CAP_PROP_FPS)
     
     # segmentation inference
     ret, frame = img_batch.read()
-    approx, seg_time = seg_inference(config, seg_ckpt, frame)
+    approx, big_approx, seg_time = seg_inference(config, seg_ckpt, frame, img_size)
 
     if approx == []:
         print('감지된 횡단 보도가 없습니다! 카메라를 재조정해주세요!')
@@ -77,15 +80,22 @@ def get_stream_cam(model_name: str = Form(...),
 
         if ret:
             if 'deep' in mode:
-                img, inf_time = inference(frame, img_size, model, approx, mode, ds=ds)
+                img, inf_time, keep_green, not_keep_red, inform = inference(frame, img_size, model, approx, big_approx, mode, ds=ds)
             else:
-                img, inf_time = inference(frame, img_size, model, approx, mode)
+                img, inf_time, keep_green, not_keep_red, inform = inference(frame, img_size, model, approx, big_approx, mode)
 
             print('FPS', 1 / inf_time * 1000)
 
+            '''
             yield (b'--frame\r\n' 
                    b'Content-Type: image/jpeg\r\n\r\n' +
                    img.tobytes() + b'\r\n')
+           '''
+            img_b64 = base64.b64encode(img).decode('utf-8')
+
+            yield {
+                'data': '{"img":"'+img_b64+'","inform":"'+str(inform)+'","keep_green":"'+keep_green+'","not_keep_red":"'+not_keep_red+'"}'
+            }
             # 100ms 지연
             #if cv2.waitKey(100) > 0:
             #    break
@@ -98,14 +108,14 @@ def get_stream_cam(model_name: str = Form(...),
     
     
 # segmentation polygon 좌표 function
-def seg_inference(config_file, ckpt_model, frame):
+def seg_inference(config_file, ckpt_model, frame, img_size):
     start_ns = time.time_ns()
 
     select = [0]
     approx_list = [0]
     approx = []
 
-    frame = cv2.resize(frame, (640,640))
+    frame = cv2.resize(frame, (img_size, img_size))
 
     # 성민님 모델
     model = init_segmentor(config_file, ckpt_model, device='cpu')
@@ -126,13 +136,14 @@ def seg_inference(config_file, ckpt_model, frame):
             approx_list.append([approx])
         else:
             continue
+    big_approx = approx_big(approx, (img_size, img_size), 1.3)
 
     inf_time = (time.time_ns() - start_ns) / 1000000
 
-    return approx, inf_time
+    return approx, big_approx, inf_time
 
 
-def inference(frame, img_size, model, approx, mode, ds=None):
+def inference(frame, img_size, model, approx, big_approx, mode, ds=None):
     # CV2 IMAGE / frame.shape : (Height, Width, BGR) >> to RGB img = img[:,:,::-1]
     frame = cv2.resize(frame, (640, 640), interpolation=cv2.INTER_CUBIC)
 
@@ -160,13 +171,23 @@ def inference(frame, img_size, model, approx, mode, ds=None):
 
         after valid check => pls make boolean: keep_green
     '''
+    # 큰박스
+    not_keep_red, idx_list = valid_box_idx(big_approx, results, is_origin=False)
 
-    json_results = results_to_json([results], classes, mode)
+    #작은 박스
+    keep_green, idx_list = valid_box_idx(approx, results, is_origin=True)
+
+    if keep_green == 'true':
+        json_results = results_to_json([results[idx_list]], classes, mode)
+        inform = len(idx_list)
+    else:
+        json_results = results_to_json([results], classes, mode)
+        inform = len(json_results[0])
 
     inf_time = (time.time_ns() - start_ns) / 1000000
-    ret, img = plot_result_image(json_results, frame, colors, approx, mode)
+    ret, img = plot_result_image(json_results, frame, colors, approx, big_approx, mode)
 
-    return img, inf_time
+    return img, inf_time, keep_green, not_keep_red, inform
 
 
 def deepsort(frame, results, ds):
