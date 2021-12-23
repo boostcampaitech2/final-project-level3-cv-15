@@ -2,6 +2,7 @@ import base64
 import time
 
 from fastapi import Form
+from fastapi.datastructures import UploadFile
 
 from mmseg.apis import init_segmentor, inference_segmentor, show_result_pyplot
 from mmseg.core.evaluation import get_palette
@@ -32,7 +33,8 @@ colors = [tuple([random.randint(0, 255) for _ in range(3)]) for _ in range(100)]
 
 def get_stream_cam(model_name: str = Form(...),
                    img_size: int = Form(640),
-                   mode: str = Form(...)
+                   mode: str = Form(...),
+                   file_location: str = ""
                    ):
     '''
     Requires an image file upload, model name (ex. yolov5s). Optional image size parameter (Default 640).
@@ -43,8 +45,8 @@ def get_stream_cam(model_name: str = Form(...),
     model_root = './models/'
 
     # segmentation model
-    config = os.path.join(model_root, 'JY_config.py')
-    seg_ckpt = os.path.join(model_root, 'JY_seg.pth')
+    config = os.path.join(model_root, 'kjy_icenet_multi_affine/[KJY]_icnet_r18.py')
+    seg_ckpt = os.path.join(model_root, 'kjy_icenet_multi_affine/[KJY]_best_mIoU_epoch_473.pth')
 
     if 'onnx' in mode:
         model = onnxruntime.InferenceSession(os.path.join(model_root, (model_name + '.onnx')))
@@ -59,7 +61,13 @@ def get_stream_cam(model_name: str = Form(...),
 
     # Image from Camera no.0
     videos_root = './videos'
-    V = os.path.join(videos_root, 'jy01.mp4')
+
+    # 우겨넣기
+    if file_location != "":
+        V = file_location
+    else:
+        V = os.path.join(videos_root, 'jy01.mp4')
+    
     img_batch = cv2.VideoCapture(V)
 
     fps = img_batch.get(cv2.CAP_PROP_FPS)

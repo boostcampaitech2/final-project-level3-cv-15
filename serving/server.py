@@ -1,3 +1,5 @@
+from os import write
+import os
 from fastapi import FastAPI, Request, Form, File, UploadFile
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -54,11 +56,9 @@ def about_us(request: Request):
 ##############################################
 #------------POST Request Routes--------------
 ##############################################
-@app.post("/")
+@app.post("/video_feed")
 async def detect_via_web_form(request: Request,
-							file_list: List[UploadFile] = File(...),
-							model_name: str = Form(...),
-							img_size: int = Form(640)):
+							file_list: List[UploadFile] = File(...)):
 
 	'''
 	Requires an image file upload, model name (ex. yolov5s). Optional image size parameter (Default 640).
@@ -66,45 +66,60 @@ async def detect_via_web_form(request: Request,
 	Returns: HTML template render showing bbox data and base64 encoded image
 	'''
 
-	#assume input validated properly if we got here
-	if model_dict[model_name] is None:
-		model_dict[model_name] = torch.hub.load('ultralytics/yolov5', model_name, pretrained=True)
+	print(file_list)
+	model_name = 'yol5_cls4_best'
+	img_size = 640
+	mode = 'torch_deep'
+	folder_name = "files"
 
-	img_batch = [cv2.imdecode(np.fromstring(await file.read(), np.uint8), cv2.IMREAD_COLOR)
-					for file in file_list]
+	if not os.path.exists(folder_name):
+		os.makedirs(folder_name)
 
-	#.copy() because the images are modified when running model, and we need originals when drawing bboxes later
-	results = model_dict[model_name](img_batch.copy(), size = img_size)
+	file_location = os.path.join(folder_name, file_list[0].filename)
+	
+	with open(file_location, "wb+") as file_object:
+		file_object.write(file_list[0].file.read())
 
-	json_results = results_to_json(results, model_dict[model_name])
+	return EventSourceResponse(get_stream_cam(model_name, img_size, mode, file_location))
+	# # #assume input validated properly if we got here
+	# # if model_dict[model_name] is None:
+	# # 	model_dict[model_name] = torch.hub.load('ultralytics/yolov5', model_name, pretrained=True)
 
-	img_str_list = []
-	#plot bboxes on the image
-	for img, bbox_list in zip(img_batch, json_results):
-		for bbox in bbox_list:
-			label = f'{bbox["class_name"]} {bbox["confidence"]:.2f}'
-			plot_one_box(bbox['bbox'], img, label=label,
-					color=colors[int(bbox['class'])], line_thickness=3)
+	# # img_batch = [cv2.imdecode(np.fromstring(await file.read(), np.uint8), cv2.IMREAD_COLOR)
+	# # 				for file in file_list]
 
-		img_str_list.append(base64EncodeImage(img))
+	# #.copy() because the images are modified when running model, and we need originals when drawing bboxes later
+	# results = model_dict[model_name](img_batch.copy(), size = img_size)
 
-	#escape the apostrophes in the json string representation
-	encoded_json_results = str(json_results).replace("'",r"\'").replace('"',r'\"')
+	# json_results = results_to_json(results, model_dict[model_name])
 
-	return templates.TemplateResponse('show_results.html', {
-			'request': request,
-			'bbox_image_data_zipped': zip(img_str_list,json_results), #unzipped in jinja2 template
-			'bbox_data_str': encoded_json_results,
-		})
+	# img_str_list = []
+	# #plot bboxes on the image
+	# for img, bbox_list in zip(img_batch, json_results):
+	# 	for bbox in bbox_list:
+	# 		label = f'{bbox["class_name"]} {bbox["confidence"]:.2f}'
+	# 		plot_one_box(bbox['bbox'], img, label=label,
+	# 				color=colors[int(bbox['class'])], line_thickness=3)
 
+	# 	img_str_list.append(base64EncodeImage(img))
+
+	# #escape the apostrophes in the json string representation
+	# encoded_json_results = str(json_results).replace("'",r"\'").replace('"',r'\"')
+
+	# return templates.TemplateResponse('show_results.html', {
+	# 		'request': request,
+	# 		'bbox_image_data_zipped': zip(img_str_list,json_results), #unzipped in jinja2 template
+	# 		'bbox_data_str': encoded_json_results,
+	# 	})
 
 @app.get("/video_feed")
 async def detect_via_web_form():
 	# 하드 코딩 된 부분 >> 인자 받아보게 변경, yaml or from html
-	#model_name = 'yol5_cls4_best'
-	model_name = 'sm_yolov5n_t1'
+	model_name = 'yol5_cls4_best'
+	# model_name = 'sm_yolov5n_t1'
 	img_size = 640
 	mode = 'torch_deep'
+
 	'''
 	Requires an image file upload, model name (ex. yolov5s). Optional image size parameter (Default 640).
 	Intended for human (non-api) users.
