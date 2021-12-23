@@ -14,7 +14,10 @@ import onnxruntime
 import random
 import numpy as np
 
-from help_funcs import (non_max_suppression, preprocess, plot_result_image, results_to_json, valid_box_idx, approx_big)
+from help_funcs import (non_max_suppression, preprocess, plot_result_image, results_to_json, valid_box_idx, approx_big,
+                        get_inform_json)
+
+import json
 
 import os
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
@@ -23,7 +26,7 @@ model_selection_options = ['yolov5s', 'yolov5m', 'yolov5l', 'yolov5x']
 model_dict = {model_name: None for model_name in model_selection_options}  # set up model cache
 classes =['bicycle', 'person', 'stroller', 'wheelchair']
 
-random.seed(3)
+random.seed(4)
 colors = [tuple([random.randint(0, 255) for _ in range(3)]) for _ in range(100)]  # for bbox plotting
 
 
@@ -40,8 +43,8 @@ def get_stream_cam(model_name: str = Form(...),
     model_root = './models/'
 
     # segmentation model
-    config = os.path.join(model_root, 'hyuns_bise.py')
-    seg_ckpt = os.path.join(model_root, 'biseNet_best_mIoU2_epoch_268.pth')
+    config = os.path.join(model_root, 'JY_config.py')
+    seg_ckpt = os.path.join(model_root, 'JY_seg.pth')
 
     if 'onnx' in mode:
         model = onnxruntime.InferenceSession(os.path.join(model_root, (model_name + '.onnx')))
@@ -67,7 +70,9 @@ def get_stream_cam(model_name: str = Form(...),
 
     if approx == []:
         print('감지된 횡단 보도가 없습니다! 카메라를 재조정해주세요!')
-        return
+        yield {
+                'data': '{"ret":"fail"}'
+            }
 
     #print("approx확인:",approx)
     #print("segtime:", seg_time)
@@ -80,9 +85,9 @@ def get_stream_cam(model_name: str = Form(...),
 
         if ret:
             if 'deep' in mode:
-                img, inf_time, keep_green, not_keep_red, inform = inference(frame, img_size, model, approx, big_approx, mode, ds=ds)
+                img, inf_time, inform = inference(frame, img_size, model, approx, big_approx, mode, ds=ds)
             else:
-                img, inf_time, keep_green, not_keep_red, inform = inference(frame, img_size, model, approx, big_approx, mode)
+                img, inf_time, inform = inference(frame, img_size, model, approx, big_approx, mode)
 
             print('FPS', 1 / inf_time * 1000)
 
@@ -93,15 +98,21 @@ def get_stream_cam(model_name: str = Form(...),
            '''
             img_b64 = base64.b64encode(img).decode('utf-8')
 
-            yield {
-                'data': '{"img":"'+img_b64+'","inform":"'+str(inform)+'","keep_green":"'+keep_green+'","not_keep_red":"'+not_keep_red+'"}'
-            }
+            yield {'data': json.dumps({
+                'img': img_b64,
+                'inform': inform,
+                'ret': True
+            })}
             # 100ms 지연
             #if cv2.waitKey(100) > 0:
             #    break
-            
+
+        # 영상 종료시
         else:
             print('Fail to read  frame!')
+            yield {
+                'data': '{"ret":"fail"}'
+            }
             break
     total_time_end = time.time_ns()
     print('total time :', (total_time_end-total_time_st) / 1000000, '(ms)')
@@ -144,10 +155,10 @@ def seg_inference(config_file, ckpt_model, frame, img_size):
 
 
 def inference(frame, img_size, model, approx, big_approx, mode, ds=None):
+    start_ns = time.time_ns()
+
     # CV2 IMAGE / frame.shape : (Height, Width, BGR) >> to RGB img = img[:,:,::-1]
     frame = cv2.resize(frame, (640, 640), interpolation=cv2.INTER_CUBIC)
-
-    start_ns = time.time_ns()
 
     # Object Detection
     if 'onnx' in mode:
@@ -165,29 +176,25 @@ def inference(frame, img_size, model, approx, big_approx, mode, ds=None):
     if 'deep' in mode:
         results = deepsort(frame, results, ds)
 
-    '''
-        TODO:
-        valid check should be here
-
-        after valid check => pls make boolean: keep_green
-    '''
     # 큰박스
-    not_keep_red, idx_list = valid_box_idx(big_approx, results, is_origin=False)
+    not_keep_red, big_idx_list = valid_box_idx(big_approx, results, is_origin=False, mode=mode)
 
-    #작은 박스
-    keep_green, idx_list = valid_box_idx(approx, results, is_origin=True)
+    # 작은 박스
+    keep_green, idx_list = valid_box_idx(approx, results, is_origin=True, mode=mode)
 
-    if keep_green == 'true':
+    if keep_green:
         json_results = results_to_json([results[idx_list]], classes, mode)
-        inform = len(idx_list)
     else:
         json_results = results_to_json([results], classes, mode)
-        inform = len(json_results[0])
 
-    inf_time = (time.time_ns() - start_ns) / 1000000
+    # 결과 정보 to json
+    inform = get_inform_json(results, idx_list,  keep_green, not not_keep_red, classes)
+
     ret, img = plot_result_image(json_results, frame, colors, approx, big_approx, mode)
 
-    return img, inf_time, keep_green, not_keep_red, inform
+    inf_time = (time.time_ns() - start_ns) / 1000000
+
+    return img, inf_time, inform
 
 
 def deepsort(frame, results, ds):
