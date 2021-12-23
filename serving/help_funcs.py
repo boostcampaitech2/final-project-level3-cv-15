@@ -266,7 +266,7 @@ def results_to_json(results, classes, mode):
         ]
 
 
-def valid_box_idx(approx, bbox_list, is_origin):
+def valid_box_idx(approx, bbox_list, is_origin, mode):
     '''
         TODO:
         현재 poly로만 convert,,,
@@ -280,20 +280,24 @@ def valid_box_idx(approx, bbox_list, is_origin):
     roi_box = mplPath.Path([i[0] for i in approx])
 
     if is_origin:
-        idx_list = [idx for idx, box in enumerate(bbox_list) if (is_in_polygon(roi_box, box) & (is_wheelchair(box) | is_stroller(box)))]
+        idx_list = [idx for idx, box in enumerate(bbox_list) if (is_in_polygon(roi_box, box, mode) & (is_wheelchair(box) | is_stroller(box)))]
     else:
-        idx_list = [idx for idx, box in enumerate(bbox_list) if (is_in_polygon(roi_box, box) & (is_wheelchair(box) | is_stroller(box) | is_person(box)))]
+        idx_list = [idx for idx, box in enumerate(bbox_list) if (is_in_polygon(roi_box, box, mode) & (is_wheelchair(box) | is_stroller(box) | is_person(box)))]
 
-    ret = 'true' if idx_list != [] else 'false'
+    ret = True if idx_list != [] else False
 
     return ret, idx_list
 
 
 # return index of box >> ex) [1,4,6,10]
-def is_in_polygon(polygon, box):
-    # approx >> [[[x,y]], [[x,y]], [[x,y]], [[x,y]]] >> change >> [[x,y], [x,y], [x,y], [x,y],]
-    #idx_list = [idx for idx, box in enumerate(bbox_list) if polygon.contains_point((box[0]+box[2]/2, box[1]+box[3]))]
-    return polygon.contains_point((box[0]+box[2]/2, box[1]+box[3]))
+
+def is_in_polygon(polygon, box, mode):
+    # deepsort >> xywh
+    if 'deep' in mode:
+        return polygon.contains_point((box[0]+box[2]/2, box[1]+box[3]))
+    # onnx >> xyxy // torch >> xyxy
+    else:
+        return polygon.contains_point(((box[0] + box[2]) / 2, box[3]))
 
 
 def is_wheelchair(box):
@@ -329,3 +333,25 @@ def chk_max_min(x, size):
         return size
     else:
         return x
+
+
+def get_inform_json(results, idx_list, keep_green, keep_red, classes):
+    inform = {}
+
+    all_box = {}
+    for pred in results:
+        class_num = int(pred[5])
+        count = all_box.get(classes[class_num], 0)
+        all_box[classes[class_num]] = count + 1
+
+    roi_box = {}
+    if idx_list != []:
+        for pred in results[idx_list]:
+            class_num = int(pred[5])
+            count = roi_box.get(classes[class_num], 0)
+            roi_box[classes[class_num]] = count + 1
+
+    inform['log'] = {'all_box': all_box, 'roi_box': roi_box}
+    inform['traffic'] = {'keep_green': keep_green, 'keep_red': keep_red}
+
+    return inform
