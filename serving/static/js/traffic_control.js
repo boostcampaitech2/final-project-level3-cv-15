@@ -1,6 +1,6 @@
 //window.onload = function () {
 var traffic_control = function(){
-    var is_red = true
+    var is_red = false
 
     //var red_time = parseInt(document.getElementById("red_time").innerText)
     var red_time = parseInt($("#red_time").val())
@@ -28,9 +28,16 @@ var traffic_control = function(){
 
     function clock() {
         if (time < 0 && is_red && !keep_red) set_green()
-        else if (time < 0) set_red()
-
-        if (!(keep_green && !is_red && time<1)) show_left_time(time--)
+        else if (time < 0) {
+            set_red(is_red)
+        }
+        
+        if (!(keep_green && !is_red && time<1)) {
+            show_left_time(time--)
+        }
+        else {
+            document.getElementById("keep_green").innerHTML = '신호 유지';
+        }
     }
 
     function show_left_time(time) {
@@ -38,22 +45,37 @@ var traffic_control = function(){
     }
 
     function set_green(){
-        document.getElementById("traffic").src = "/static/src/img/green.jpg"
+        $('.traffic-green').css({
+            "background-color":"rgb(53, 218, 103)"
+        })
+        $('.traffic-red').css({
+            "background-color":"gray"
+        })
+        $('.traffic-text').css({
+            "background-color":"rgb(53, 218, 103)"
+        })
+        document.getElementById("keep_green").innerHTML = '';
 
         time = green_time
         is_red = false
     }
 
     function set_red() {
-        document.getElementById("traffic").src = "/static/src/img/red.jpg"
+        $('.traffic-red').css({
+            "background-color":"rgb(223, 58, 58)"
+        })
+        $('.traffic-green').css({
+            "background-color":"gray"
+        })
+        $('.traffic-text').css({
+            "background-color":"rgb(223, 58, 58)"
+        })
 
+        if(is_red) document.getElementById("keep_green").innerHTML = '스킵됨';
+        else document.getElementById("keep_green").innerHTML = '';
         time = red_time
         is_red = true
     }
-
-    // 1초마다 반복
-    clock();
-    setInterval(clock, 1000);
 
     return {
         set_keep_green: function (bool) {
@@ -62,6 +84,13 @@ var traffic_control = function(){
 
         set_keep_red: function (bool) {
             keep_red = bool
+        },
+
+        traffic_start: function (){
+            set_red()
+            // 1초마다 반복
+            clock();
+            setInterval(clock, 1000);
         }
     }
 }
