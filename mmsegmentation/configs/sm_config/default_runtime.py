@@ -7,7 +7,7 @@ log_config = dict(
         init_kwargs=dict(
             project='final_project',
             entity='ptop',
-            name='sm_icnet_default_train_1'
+            name='sm_icnet_new_dataset_w160k_affine_shear'
         ))
     ])
 # yapf:enable

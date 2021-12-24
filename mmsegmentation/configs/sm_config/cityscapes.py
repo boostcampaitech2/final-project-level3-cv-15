@@ -1,6 +1,6 @@
 # dataset settings
 dataset_type = 'CrosswalkDataset'
-data_root = 'dataset'
+data_root = '/opt/ml/data/carview_crosswalk'
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
 crop_size = (512, 512)
@@ -8,8 +8,10 @@ train_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(type='LoadAnnotations'),
     dict(type='Resize', img_scale=(960, 540), ratio_range=(0.5, 2.0)),
+    dict(type='RandomFlip', prob=0.5, direction='vertical'),
     dict(type='RandomCrop', crop_size=crop_size, cat_max_ratio=0.75),
-    dict(type='RandomFlip', prob=0.5),
+    dict(type='AffineTransform', shear=(-45,45)),
+    dict(type='RandomRotate', prob=0.5, degree=90),
     dict(type='PhotoMetricDistortion'),
     dict(type='Normalize', **img_norm_cfg),
     dict(type='Pad', size=crop_size, pad_val=0, seg_pad_val=255),
@@ -37,14 +39,14 @@ data = dict(
     train=dict(
         type=dataset_type,
         data_root=data_root,
-        img_dir='images/train_1',
-        ann_dir='annotations/train_1',
+        img_dir='images/train',
+        ann_dir='gt/train',
         pipeline=train_pipeline),
     val=dict(
         type=dataset_type,
         data_root=data_root,
-        img_dir='images/valid_1',
-        ann_dir='annotations/valid_1',
+        img_dir='images/val',
+        ann_dir='gt/val',
         pipeline=test_pipeline),
     test=dict(
         type=dataset_type,
