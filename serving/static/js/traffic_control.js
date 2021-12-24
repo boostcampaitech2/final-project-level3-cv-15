@@ -71,7 +71,7 @@ var traffic_control = function(){
             "background-color":"rgb(223, 58, 58)"
         })
 
-        if(is_red) document.getElementById("keep_green").innerHTML = '스킵됨';
+        if(is_red) document.getElementById("keep_green").innerHTML = '신호 Skip';
         else document.getElementById("keep_green").innerHTML = '';
         time = red_time
         is_red = true
