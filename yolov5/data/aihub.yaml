@@ -1,0 +1,6 @@
+path:  dataset/aihub_pedestrian
+train: train/images
+val: valid/images
+
+nc: 4
+names: ['bicycle', 'person', 'stroller', 'wheelchair']
