@@ -1,0 +1,38 @@
+- release_tracks: [ALPHA]
+  hidden: true
+  help_text:
+    brief: |
+      List Dataplex Asset Resources.
+    description: |
+      List Dataplex Asset resource based on project, location, lake, and zone. Currently list does not support project/{project_id}/.../ notation.
+
+      {command} --project={project_id} --location={location} --lake={test-lake} --zone={test-zone}
+    examples: |
+      {command} --project=test-project --location=us-central1 --lake=test-lake --zone=test-zone
+
+  request:
+    ALPHA:
+      api_version: v1
+    collection: dataplex.projects.locations.lakes.zones.assets
+  arguments:
+    resource:
+      help_text: |
+        Arguments and flags that define the Dataplex Asset you want to list.
+      spec: !REF googlecloudsdk.command_lib.dataplex.resources:zone
+
+  response:
+    id_field: name
+  output:
+    format: |
+      table(
+        name.basename():label=NAME,
+        displayName:label=DISPLAY_NAME,
+        state:label=ASSET_STATUS,
+        discoverySpec.enabled:label=DISCOVERY_ENABLED,
+        discoveryStatus.state:label=DISCOVERY_STATUS,
+        resourceSpec.name:label=RESOURCE_NAME,
+        resourceSpec.type:label=RESOURCE_TYPE,
+        resourceStatus.state:label=RESOURCE_STATE,
+        securityStatus.state:label=SECURITY_STATUS,
+        labels:label=LABELS
+      )

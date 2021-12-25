@@ -1,0 +1,37 @@
+- release_tracks: [ALPHA]
+  hidden: true
+  help_text:
+    brief: |
+      List Dataplex Zone Resources.
+    description: |
+      List Dataplex Zone resource based on project, location, and lake. Currently list does not support project/{project_id}/.../ notation.
+
+      {command} --project={project_id} --location={location} --lake={lake_id}
+    examples: |
+      {command} --projects="test-project" --locations=us-central1 --lakes=test-lake
+
+  request:
+    ALPHA:
+      api_version: v1
+    collection: dataplex.projects.locations.lakes.zones
+  arguments:
+    resource:
+      help_text: |
+        Arguments and flags that define the Dataplex Zone you want to list.
+      spec: !REF googlecloudsdk.command_lib.dataplex.resources:lake
+
+  response:
+    id_field: name
+  output:
+    format: |
+      table(
+        name.basename():label=NAME,
+        displayName:label=DISPLAY_NAME,
+        state:label=ZONE_STATUS,
+        type:label=ZONE_TYPE,
+        resourceSpec.locationType:label=RESOURCE_LOCATION_TYPE,
+        discoverySpec.enabled:label=DISCOVERY_ENABLED,
+        securityStatus.state:label=SECURITY_STATUS,
+        assetStatus.activeAssets:label=ACTIVE_ASSETS,
+        labels:label=LABELS
+      )

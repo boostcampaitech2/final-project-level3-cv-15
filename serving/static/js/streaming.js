@@ -2,7 +2,9 @@ function streaming(){
     var set_up = false
     var traffic = traffic_control()
 
-    var source = new EventSource("http://localhost:8000/video_feed");
+    var source = new EventSource("http://34.64.139.254:8000/video_feed");
+    // var source = new EventSource("http://localhost:8000/video_feed");
+    
     source.onmessage = function(event) {
         var data = JSON.parse(event.data)
 
@@ -43,6 +45,7 @@ function streaming_upload(FileList){
     console.log(typeof(FileList))
     alert(FileList)
 
+    // var source = new SSE("http://0.0.0.0:8000/video_feed", {file_list: FileList});
     var source = new SSE("http://localhost:8000/video_feed", {file_list: FileList});
     source.onmessage = function(event) {
         var data = JSON.parse(event.data)

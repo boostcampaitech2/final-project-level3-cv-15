@@ -25,9 +25,13 @@ def send_request(file_list = ['./images/zidane.jpg'],
 					'img_size': img_size,
 					'download_image': download_image}
 
-	res = r.post("http://localhost:8000/detect/", 
+	res = r.post("http://localhost:8000/detect/",
 					data = other_form_data, 
 					files = files)
+
+	# res = r.post("http://0.0.0.0:8000/detect/",
+	# 				data = other_form_data, 
+	# 				files = files)
 
 	if download_image:
 		json_data = res.json()

@@ -65,11 +65,11 @@ async def detect_via_web_form(request: Request,
 	Intended for human (non-api) users.
 	Returns: HTML template render showing bbox data and base64 encoded image
 	'''
-
 	print(file_list)
 	model_name = 'yol5_cls4_best'
 	img_size = 640
 	mode = 'torch_deep'
+	# mode = 'onnx_deep'
 	folder_name = "files"
 
 	if not os.path.exists(folder_name):
@@ -115,6 +115,7 @@ async def detect_via_web_form(request: Request,
 @app.get("/video_feed")
 async def detect_via_web_form():
 	# 하드 코딩 된 부분 >> 인자 받아보게 변경, yaml or from html
+	print("여긴듯?")
 	model_name = 'yol5_cls4_best'
 	# model_name = 'sm_yolov5n_t1'
 	img_size = 640
@@ -146,7 +147,7 @@ async def detect_via_api(request: Request,
 
 	Intended for API usage.
 	'''
-
+	
 	if model_dict[model_name] is None:
 		model_dict[model_name] = torch.hub.load('ultralytics/yolov5', model_name, pretrained=True)
 

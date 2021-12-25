@@ -66,8 +66,9 @@ def get_stream_cam(model_name: str = Form(...),
     if file_location != "":
         V = file_location
     else:
-        V = os.path.join(videos_root, 'jy8.mp4')
-    
+        # V = os.path.join(videos_root, 'jy8.mp4')
+        V = os.path.join(videos_root, 'hs11_5.mp4')
+        
     img_batch = cv2.VideoCapture(V)
 
     fps = img_batch.get(cv2.CAP_PROP_FPS)
