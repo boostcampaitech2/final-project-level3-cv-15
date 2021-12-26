@@ -1,0 +1,98 @@
+{% extends "layout.html" %}
+
+{% block content %}
+
+
+<head>
+  <link rel="stylesheet" href="../static/css/styles.css">
+  <script src="https://kit.fontawesome.com/38be66c23d.js" crossorigin="anonymous"></script>
+</head>
+
+<header>
+  <h1 id="screen-header">신호 체계</h1>
+</header>
+
+<main>
+  <div id="video-info">
+
+    <div class="video-info__name">
+      <h3> video </h3>
+      <img id="streaming" src="" visibility='hidden'>
+    </div>
+
+    <div class="video-info__disp">
+      <div class="video-info__display">
+        <span class="video-info__display-name">신호등</span>
+        <div class="video-info__display-img traffic-red">
+          <i class="far fa-grin-beam-sweat"></i>
+        </div>
+        <div class="video-info__display-img traffic-green">
+          <i class="far fa-smile"></i>
+        </div>
+          
+        <div class="video-info__display-text traffic-text">
+          <p id="left_time">1</p>
+          <p id="keep_green"></p>
+        </div>
+      </div>
+  
+      <div class="video-info__input">
+  
+        <div class="video-info__input-rsec">
+          <input class="time_input" type="text" id="red_time" value="15">
+        </div>
+  
+        <div class="video-info__input-gsec">
+          <input class="time_input" type="text" id="green_time" value="10">
+        </div>
+        
+        <div class="video-info__input-btn">
+          <label for="">강제 신호</label>
+          <div class="video-info__input-btn-primary">
+            <button id="set_red" class="btn btn-primary">빨</button>
+            <button id="set_green" class="btn btn-primary">초</button> 
+          </div>
+        </div>
+  
+      </div>
+
+    </div>
+    
+  </div>
+
+  <div class="user">
+
+    <div class="user-log">
+
+      <span class="user-log-1" id = "log-1">
+        log-1
+      </span>
+
+      <span class="user-log-2" id = "log-2">
+        user-log-2
+      </span>
+
+      <span class="user-log-3" id = "log-3">
+        log-3
+      </span>
+      
+    </div>
+
+    <div class="user_btn">
+      <form method="post" id="form-id" action="video_feed" enctype="multipart/form-data">
+        <div class="mb-3">
+          <label class="form-label" for="file_list">
+            Upload Videos
+          </label>
+          <input class="form-control w-auto" type="file" name="file_list" id="file_list" multiple />
+        </div>
+        <button id="btn_submit" class="btn btn-primary">Submit</button>
+      </form>
+
+      <button id="btn_stream" class="btn btn-primary">stream start</button>
+    </div>
+
+  </div>
+
+</main>
+{% endblock %}

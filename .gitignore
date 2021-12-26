@@ -2,4 +2,14 @@ xml/
 *.csv
 *.zip
 *.json
+<<<<<<< HEAD
 test.ipynb
+=======
+*.pt
+*.pth
+*.pyc
+
+__pycache__/*
+*/__pycache__/
+*/__pycache__/*
+>>>>>>> 1f5f433fb9977df43b68ceb68e551119dd84a23b
