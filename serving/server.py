@@ -6,6 +6,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List, Optional
+import ssl
 
 from sse_starlette.sse import EventSourceResponse
 
@@ -188,6 +189,7 @@ if __name__ == '__main__':
 	if opt.precache_models:
 		model_dict = {model_name: torch.hub.load('ultralytics/yolov5', model_name, pretrained=True) 
 						for model_name in model_selection_options}
-	
+	ssl._create_default_https_context = ssl._create_unverified_context
+
 	app_str = 'server:app' #make the app string equal to whatever the name of this file is
 	uvicorn.run(app_str, host= opt.host, port=opt.port, reload=True)

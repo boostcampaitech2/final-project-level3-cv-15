@@ -2,8 +2,8 @@ function streaming(){
     var set_up = false
     var traffic = traffic_control()
 
-    var source = new EventSource("http://34.64.139.254:8000/video_feed");
-    // var source = new EventSource("http://localhost:8000/video_feed");
+    // var source = new EventSource("http://34.64.139.254:8000/video_feed");
+    var source = new EventSource("http://localhost:8000/video_feed");
     
     source.onmessage = function(event) {
         var data = JSON.parse(event.data)
