@@ -3,6 +3,7 @@ xml/
 *.zip
 *.json
 *.pt
+*.pth
 *.pyc
 
 __pycache__/*
