@@ -57,7 +57,7 @@ def about_us(request: Request):
 ##############################################
 #------------POST Request Routes--------------
 ##############################################
-@app.post("/video_feed")
+@app.post("/video_upload")
 async def detect_via_web_form(request: Request,
 							file_list: List[UploadFile] = File(...)):
 
@@ -66,11 +66,6 @@ async def detect_via_web_form(request: Request,
 	Intended for human (non-api) users.
 	Returns: HTML template render showing bbox data and base64 encoded image
 	'''
-	print(file_list)
-	model_name = 'yol5_cls4_best'
-	img_size = 640
-	mode = 'torch_deep'
-	# mode = 'onnx_deep'
 	folder_name = "files"
 
 	if not os.path.exists(folder_name):
@@ -81,42 +76,12 @@ async def detect_via_web_form(request: Request,
 	with open(file_location, "wb+") as file_object:
 		file_object.write(file_list[0].file.read())
 
-	return EventSourceResponse(get_stream_cam(model_name, img_size, mode, file_location))
-	# # #assume input validated properly if we got here
-	# # if model_dict[model_name] is None:
-	# # 	model_dict[model_name] = torch.hub.load('ultralytics/yolov5', model_name, pretrained=True)
+	return file_location
 
-	# # img_batch = [cv2.imdecode(np.fromstring(await file.read(), np.uint8), cv2.IMREAD_COLOR)
-	# # 				for file in file_list]
-
-	# #.copy() because the images are modified when running model, and we need originals when drawing bboxes later
-	# results = model_dict[model_name](img_batch.copy(), size = img_size)
-
-	# json_results = results_to_json(results, model_dict[model_name])
-
-	# img_str_list = []
-	# #plot bboxes on the image
-	# for img, bbox_list in zip(img_batch, json_results):
-	# 	for bbox in bbox_list:
-	# 		label = f'{bbox["class_name"]} {bbox["confidence"]:.2f}'
-	# 		plot_one_box(bbox['bbox'], img, label=label,
-	# 				color=colors[int(bbox['class'])], line_thickness=3)
-
-	# 	img_str_list.append(base64EncodeImage(img))
-
-	# #escape the apostrophes in the json string representation
-	# encoded_json_results = str(json_results).replace("'",r"\'").replace('"',r'\"')
-
-	# return templates.TemplateResponse('show_results.html', {
-	# 		'request': request,
-	# 		'bbox_image_data_zipped': zip(img_str_list,json_results), #unzipped in jinja2 template
-	# 		'bbox_data_str': encoded_json_results,
-	# 	})
 
 @app.get("/video_feed")
-async def detect_via_web_form():
+async def detect_via_web_form(file_path: Optional[str] = ""):
 	# 하드 코딩 된 부분 >> 인자 받아보게 변경, yaml or from html
-	print("여긴듯?")
 	model_name = 'yol5_cls4_best'
 	# model_name = 'sm_yolov5n_t1'
 	img_size = 640
@@ -128,7 +93,7 @@ async def detect_via_web_form():
 	Returns: HTML template render showing bbox data and base64 encoded image
 	'''
 	#return StreamingResponse(get_stream_cam(model_name, img_size, mode), media_type="multipart/x-mixed-replace; boundary=frame")
-	return EventSourceResponse(get_stream_cam(model_name, img_size, mode))
+	return EventSourceResponse(get_stream_cam(model_name, img_size, mode, file_path))
 
 
 @app.post("/detect/")
