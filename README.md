@@ -61,7 +61,7 @@ source virtualvenv/bin/activate
 pip install -r requirements.txt
 ```
 
-# Run Sever
+# Run Server
 ```shell
 python serving/server.py
 ```
