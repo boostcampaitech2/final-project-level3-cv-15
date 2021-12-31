@@ -17,7 +17,7 @@
 # Member
 |김준영|김현수|안소정|임성민|황주영|
 | :---: | :---: | :---: | :---: | :---: |
-| <a href='https://github.com/falling90'><img scr='https://avatars.githubusercontent.com/u/7510446?v=4'> | <a href='https://github.com/hyuns1102'><img scr='https://avatars.githubusercontent.com/u/77105441?v=4'> | <a href='https://github.com/ansojung'><img scr='https://avatars.githubusercontent.com/u/87688924?v=4'> | <a href='https://github.com/mickeyshoes'><img scr='https://avatars.githubusercontent.com/u/49228132?v=4'> | <a href='https://github.com/saberhark'><img scr='https://avatars.githubusercontent.com/u/34380276?v=4'> | 
+| <a href='https://github.com/falling90'><img scr='https://avatars.githubusercontent.com/u/7510446?v=4'></a> | <a href='https://github.com/hyuns1102'><img scr='https://avatars.githubusercontent.com/u/77105441?v=4'></a> | <a href='https://github.com/ansojung'><img scr='https://avatars.githubusercontent.com/u/87688924?v=4'></a> | <a href='https://github.com/mickeyshoes'><img scr='https://avatars.githubusercontent.com/u/49228132?v=4'></a> | <a href='https://github.com/saberhark'><img scr='https://avatars.githubusercontent.com/u/34380276?v=4'></a> | 
  | Data, Modeling | Data, Modeling, Frontend | Backend |Data, Modeling |Web Full-stack|
 
 
