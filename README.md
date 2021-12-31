@@ -68,12 +68,9 @@ python serving/server.py
 
 # Result
 
-<!-- [![success1](http://img.youtube.com/vi/7nSc8btsQPg/0.jpg)](https://www.youtube.com/watch?v=7nSc8btsQPg) -->
-[<img src="http://img.youtube.com/vi/7nSc8btsQPg/0.jpg" width="400" height="300">](https://www.youtube.com/watch?v=7nSc8btsQPg) <span> [이미지 링크] 부스트캠프 AI Tech 2기 네트워킹데이 p2p 시연영상(휠체어 감지) </span>
+[<img src="http://img.youtube.com/vi/7nSc8btsQPg/0.jpg" width="400" height="300">](https://www.youtube.com/watch?v=7nSc8btsQPg) [이미지 링크] 부스트캠프 AI Tech 2기 네트워킹데이 p2p 시연영상(휠체어 감지)
 
-[<img src="http://img.youtube.com/vi/M45dbMqYT1A/0.jpg" width="400" height="300">](https://www.youtube.com/watch?v=M45dbMqYT1A) <span> [이미지 링크] 부스트캠프 AI Tech 2기 p2p 시연영상(사람x) </span>
-
-<!-- [![success2](http://img.youtube.com/vi/M45dbMqYT1A/0.jpg)](https://www.youtube.com/watch?v=M45dbMqYT1A) -->
+[<img src="http://img.youtube.com/vi/M45dbMqYT1A/0.jpg" width="400" height="300">](https://www.youtube.com/watch?v=M45dbMqYT1A) [이미지 링크] 부스트캠프 AI Tech 2기 p2p 시연영상(사람x)
 
 
 
