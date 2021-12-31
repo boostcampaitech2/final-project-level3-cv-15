@@ -8,7 +8,7 @@
     - [Logic](###Logic)
     - [Model](###Model)
 - [Install](#Install)
-- [RunServer](#Run Server)
+- [RunServer](#Run-Server)
 - [Result](#Result)
 - [Reference](#Reference)
 
